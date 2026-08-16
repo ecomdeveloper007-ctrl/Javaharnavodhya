@@ -1,0 +1,305 @@
+{
+  "version": "1.0.0",
+  "entities": {
+    "alumniProfiles": {
+      "title": "Alumni Profiles",
+      "description": "Registered and verified alumni profiles of JNV Pachpadra",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "avatar": { "type": "string" },
+        "batchYear": { "type": "number" },
+        "house": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "country": { "type": "string" },
+        "profession": { "type": "string" },
+        "company": { "type": "string" },
+        "designation": { "type": "string" },
+        "industry": { "type": "string" },
+        "bio": { "type": "string" },
+        "linkedIn": { "type": "string" },
+        "website": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "bloodGroup": { "type": "string" },
+        "isMentorAvailable": { "type": "boolean" },
+        "isBusinessOwner": { "type": "boolean" },
+        "isLookingForJobs": { "type": "boolean" },
+        "isHiring": { "type": "boolean" },
+        "verificationStatus": { "type": "string" },
+        "verifiedAt": { "type": "string" },
+        "verifiedBy": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["fullName", "batchYear", "email", "verificationStatus"]
+    },
+    "batches": {
+      "title": "Batches",
+      "description": "JNV Pachpadra passout batches and coordinators",
+      "type": "object",
+      "properties": {
+        "passoutYear": { "type": "number" },
+        "batchName": { "type": "string" },
+        "coordinatorId": { "type": "string" },
+        "coordinatorName": { "type": "string" },
+        "coordinatorPhone": { "type": "string" },
+        "description": { "type": "string" },
+        "batchPhoto": { "type": "string" },
+        "totalStudents": { "type": "number" },
+        "motto": { "type": "string" }
+      }
+    },
+    "businesses": {
+      "title": "Alumni Businesses",
+      "description": "Alumni registered business directory",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "ownerBatch": { "type": "number" },
+        "ownerEmail": { "type": "string" },
+        "ownerPhone": { "type": "string" },
+        "website": { "type": "string" },
+        "description": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "city": { "type": "string" },
+        "discountForAlumni": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "jobs": {
+      "title": "Jobs & Opportunities",
+      "description": "Career and job postings by alumni",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "company": { "type": "string" },
+        "location": { "type": "string" },
+        "employmentType": { "type": "string" },
+        "experience": { "type": "string" },
+        "salaryRange": { "type": "string" },
+        "description": { "type": "string" },
+        "applyLinkOrEmail": { "type": "string" },
+        "postedByName": { "type": "string" },
+        "postedByBatch": { "type": "number" },
+        "postedByEmail": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "welfareCases": {
+      "title": "Welfare Cases",
+      "description": "Emergency alumni and student welfare fund requests",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "beneficiary": { "type": "string" },
+        "beneficiaryBatch": { "type": "number" },
+        "urgency": { "type": "string" },
+        "description": { "type": "string" },
+        "amountRequired": { "type": "number" },
+        "amountRaised": { "type": "number" },
+        "status": { "type": "string" },
+        "verifiedBy": { "type": "string" },
+        "upiId": { "type": "string" },
+        "bankDetails": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "donationCampaigns": {
+      "title": "Donation Campaigns",
+      "description": "Active donation campaigns for school infrastructure, scholarships & welfare",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "targetAmount": { "type": "number" },
+        "currentAmount": { "type": "number" },
+        "donorsCount": { "type": "number" },
+        "endDate": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "donations": {
+      "title": "Donations",
+      "description": "Donation records and receipts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "campaignId": { "type": "string" },
+        "campaignTitle": { "type": "string" },
+        "donorName": { "type": "string" },
+        "donorEmail": { "type": "string" },
+        "donorBatch": { "type": "number" },
+        "amount": { "type": "number" },
+        "paymentMode": { "type": "string" },
+        "transactionRef": { "type": "string" },
+        "paymentStatus": { "type": "string" },
+        "isAnonymous": { "type": "boolean" },
+        "note": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "financialTransactions": {
+      "title": "Financial Ledger",
+      "description": "Public transparency ledger: income, expense, and welfare disbursements",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "type": { "type": "string" },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "date": { "type": "string" },
+        "receiptUrl": { "type": "string" },
+        "auditedBy": { "type": "string" }
+      }
+    },
+    "events": {
+      "title": "Events & Reunions",
+      "description": "Alumni meets, webinars, silver jubilee reunions and sports tournaments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "location": { "type": "string" },
+        "isOnline": { "type": "boolean" },
+        "meetingLink": { "type": "string" },
+        "description": { "type": "string" },
+        "registeredCount": { "type": "number" },
+        "image": { "type": "string" }
+      }
+    },
+    "elections": {
+      "title": "Elections & Governance",
+      "description": "Alumni executive committee elections, candidates, and voting",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "term": { "type": "string" },
+        "status": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "totalVotesCast": { "type": "number" },
+        "positions": { "type": "array" }
+      }
+    },
+    "memories": {
+      "title": "Memories Archive",
+      "description": "Nostalgia photos, campus stories, teacher memories, and hostel stories",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "caption": { "type": "string" },
+        "year": { "type": "number" },
+        "house": { "type": "string" },
+        "submittedByName": { "type": "string" },
+        "submittedByBatch": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "likesCount": { "type": "number" },
+        "isApproved": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "achievements": {
+      "title": "Wall of Fame & Achievements",
+      "description": "Alumni civil service, military, tech, business & sports achievements",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "alumniName": { "type": "string" },
+        "batchYear": { "type": "number" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "award": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "isApproved": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "auditLogs": {
+      "title": "Audit Logs",
+      "description": "Security and administrative audit trail",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "action": { "type": "string" },
+        "userName": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "details": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/alumniProfiles/{profileId}": {
+      "schema": "alumniProfiles",
+      "description": "Registered alumni profiles collection"
+    },
+    "/batches/{batchId}": {
+      "schema": "batches",
+      "description": "Batch directory"
+    },
+    "/businesses/{businessId}": {
+      "schema": "businesses",
+      "description": "Alumni business directory"
+    },
+    "/jobs/{jobId}": {
+      "schema": "jobs",
+      "description": "Alumni job postings"
+    },
+    "/welfareCases/{caseId}": {
+      "schema": "welfareCases",
+      "description": "Emergency welfare requests"
+    },
+    "/donationCampaigns/{campaignId}": {
+      "schema": "donationCampaigns",
+      "description": "Fundraising campaigns"
+    },
+    "/donations/{donationId}": {
+      "schema": "donations",
+      "description": "Donations records"
+    },
+    "/financialTransactions/{txId}": {
+      "schema": "financialTransactions",
+      "description": "Public transparency ledger"
+    },
+    "/events/{eventId}": {
+      "schema": "events",
+      "description": "Alumni events and meets"
+    },
+    "/elections/{electionId}": {
+      "schema": "elections",
+      "description": "Alumni committee elections"
+    },
+    "/memories/{memoryId}": {
+      "schema": "memories",
+      "description": "Campus memory archive"
+    },
+    "/achievements/{achievementId}": {
+      "schema": "achievements",
+      "description": "Hall of fame honors"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "auditLogs",
+      "description": "Admin actions audit log"
+    }
+  }
+}

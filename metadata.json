@@ -1,0 +1,6 @@
+{
+  "name": "JNV Pachpadra Alumni Network",
+  "description": "Official institutional portal and integrated alumni management system for Jawahar Navodaya Vidyalaya Pachpadra, Barmer, Rajasthan.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

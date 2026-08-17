@@ -50,12 +50,12 @@ export const DirectoryTab: React.FC = () => {
       const matchesSearch =
         q === '' ||
         (isBloodSearch && alum.bloodGroup) ||
-        alum.fullName.toLowerCase().includes(q) ||
-        alum.profession.toLowerCase().includes(q) ||
-        alum.company.toLowerCase().includes(q) ||
-        alum.city.toLowerCase().includes(q) ||
-        alum.state.toLowerCase().includes(q) ||
-        alum.batchYear.toString().includes(q) ||
+        (alum.fullName && alum.fullName.toLowerCase().includes(q)) ||
+        (alum.profession && alum.profession.toLowerCase().includes(q)) ||
+        (alum.company && alum.company.toLowerCase().includes(q)) ||
+        (alum.city && alum.city.toLowerCase().includes(q)) ||
+        (alum.state && alum.state.toLowerCase().includes(q)) ||
+        (alum.batchYear && alum.batchYear.toString().includes(q)) ||
         (alum.house && alum.house.toLowerCase().includes(q)) ||
         (alum.bloodGroup && alum.bloodGroup.toLowerCase().includes(q));
 

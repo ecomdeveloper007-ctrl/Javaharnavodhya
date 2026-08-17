@@ -21,10 +21,14 @@ import {
   MapPin,
   Plus,
   Save,
-  X
+  X,
+  Upload,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import { UserRole, AlumniProfile } from '../../types';
 import { SEED_ROLES_PERMISSIONS } from '../../data/seedData';
+import { CSVBulkImportModal } from './CSVBulkImportModal';
 
 export const AdminUserRoleManager: React.FC = () => {
   const {
@@ -36,13 +40,27 @@ export const AdminUserRoleManager: React.FC = () => {
     updateAlumniProfile,
     deleteAlumni,
     approveAlumni,
-    deactivateAlumni
+    deactivateAlumni,
+    getCSVTemplate
   } = useData();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [batchFilter, setBatchFilter] = useState('all');
+  const [isCSVModalOpen, setIsCSVModalOpen] = useState(false);
+
+  const handleDownloadSampleAlumni = () => {
+    const template = getCSVTemplate('alumni');
+    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'sample_alumni_data.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Direct Alumnus Creator Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -78,10 +96,11 @@ export const AdminUserRoleManager: React.FC = () => {
   // Filtered alumni list
   const filteredAlumni = alumni.filter(a => {
     const matchesSearch =
-      a.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.profession.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.city.toLowerCase().includes(searchTerm.toLowerCase());
+      !searchTerm ||
+      (a.fullName && a.fullName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (a.email && a.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (a.profession && a.profession.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (a.city && a.city.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesStatus = statusFilter === 'all' || a.verificationStatus === statusFilter;
     const matchesBatch = batchFilter === 'all' || a.batchYear.toString() === batchFilter;
@@ -146,14 +165,34 @@ export const AdminUserRoleManager: React.FC = () => {
               Assign administrative roles (Super Admin, Alumni Manager, Election Officer, Financial Auditor, Verified Alumnus), manage membership credentials, and directly onboard alumni.
             </p>
           </div>
-          <button
-            id="add-direct-alumnus-btn"
-            onClick={() => setIsAddModalOpen(true)}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
-          >
-            <UserPlus className="w-4 h-4" />
-            Add Verified Alumnus Directly
-          </button>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              id="download-alumni-sample-csv-btn"
+              onClick={handleDownloadSampleAlumni}
+              className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition-all cursor-pointer"
+              title="Download verified sample alumni CSV spreadsheet"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download Sample Data</span>
+            </button>
+            <button
+              id="upload-alumni-csv-btn"
+              onClick={() => setIsCSVModalOpen(true)}
+              className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-md transition-all cursor-pointer"
+              title="Bulk upload or update alumni details via CSV"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Upload through CSV</span>
+            </button>
+            <button
+              id="add-direct-alumnus-btn"
+              onClick={() => setIsAddModalOpen(true)}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Add Verified Alumnus</span>
+            </button>
+          </div>
         </div>
 
         {/* Roles Quick Legend */}
@@ -614,6 +653,12 @@ export const AdminUserRoleManager: React.FC = () => {
           </div>
         </div>
       )}
+      {/* CSV Bulk Import and Update Modal */}
+      <CSVBulkImportModal
+        isOpen={isCSVModalOpen}
+        onClose={() => setIsCSVModalOpen(false)}
+        initialModule="alumni"
+      />
     </div>
   );
 };

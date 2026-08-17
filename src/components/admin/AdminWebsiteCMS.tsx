@@ -18,9 +18,12 @@ import {
   MapPin,
   Sparkles,
   Layers,
-  FileText
+  FileText,
+  Download,
+  Upload
 } from 'lucide-react';
 import { BoardTopper, VMCLeader, HouseInfo } from '../../types';
+import { CSVBulkImportModal } from './CSVBulkImportModal';
 
 export const AdminWebsiteCMS: React.FC = () => {
   const {
@@ -35,11 +38,25 @@ export const AdminWebsiteCMS: React.FC = () => {
     vmcMembers,
     addVMCMember,
     updateVMCMember,
-    deleteVMCMember
+    deleteVMCMember,
+    getCSVTemplate
   } = useData();
 
   const [activeSubTab, setActiveSubTab] = useState<'general' | 'principal' | 'houses' | 'toppers' | 'vmc'>('general');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [csvModalModule, setCsvModalModule] = useState<string | null>(null);
+
+  const handleDownloadSample = (moduleId: string) => {
+    const template = getCSVTemplate(moduleId);
+    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `sample_${moduleId}_data.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Local Form state for General settings
   const [generalForm, setGeneralForm] = useState(schoolSettings);
@@ -522,21 +539,41 @@ export const AdminWebsiteCMS: React.FC = () => {
       {/* 4. CBSE Board Toppers */}
       {activeSubTab === 'toppers' && (
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
             <div>
               <h3 className="text-lg font-bold text-white">CBSE Board Toppers & Merit Roll</h3>
               <p className="text-xs text-slate-400">Manage Class X & XII academic toppers featured on the website</p>
             </div>
-            <button
-              onClick={() => {
-                setEditingTopper(null);
-                setIsAddTopperOpen(true);
-              }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
-            >
-              <Plus className="w-4 h-4" />
-              Add Board Topper
-            </button>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                id="download-toppers-sample-csv-btn"
+                onClick={() => handleDownloadSample('toppers')}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs font-bold transition shadow"
+                title="Download sample board toppers CSV template"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Sample Data</span>
+              </button>
+              <button
+                id="upload-toppers-csv-btn"
+                onClick={() => setCsvModalModule('toppers')}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition shadow"
+                title="Bulk upload or update board toppers via CSV"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload through CSV</span>
+              </button>
+              <button
+                onClick={() => {
+                  setEditingTopper(null);
+                  setIsAddTopperOpen(true);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
+              >
+                <Plus className="w-4 h-4" />
+                Add Board Topper
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -597,21 +634,41 @@ export const AdminWebsiteCMS: React.FC = () => {
       {/* 5. VMC Committee Leaders */}
       {activeSubTab === 'vmc' && (
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
             <div>
               <h3 className="text-lg font-bold text-white">Vidyalaya Management Committee (VMC)</h3>
               <p className="text-xs text-slate-400">Institutional governing board comprising district administration</p>
             </div>
-            <button
-              onClick={() => {
-                setEditingVMC(null);
-                setIsAddVMCOpen(true);
-              }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
-            >
-              <Plus className="w-4 h-4" />
-              Add VMC Member
-            </button>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                id="download-vmc-sample-csv-btn"
+                onClick={() => handleDownloadSample('vmc_members')}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs font-bold transition shadow"
+                title="Download sample VMC members CSV template"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Sample Data</span>
+              </button>
+              <button
+                id="upload-vmc-csv-btn"
+                onClick={() => setCsvModalModule('vmc_members')}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition shadow"
+                title="Bulk upload or update VMC members via CSV"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload through CSV</span>
+              </button>
+              <button
+                onClick={() => {
+                  setEditingVMC(null);
+                  setIsAddVMCOpen(true);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
+              >
+                <Plus className="w-4 h-4" />
+                Add VMC Member
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -833,6 +890,12 @@ export const AdminWebsiteCMS: React.FC = () => {
           </div>
         </div>
       )}
+      {/* CSV Bulk Import Modal */}
+      <CSVBulkImportModal
+        isOpen={!!csvModalModule}
+        onClose={() => setCsvModalModule(null)}
+        initialModule={csvModalModule || 'toppers'}
+      />
     </div>
   );
 };

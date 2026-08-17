@@ -24,7 +24,9 @@ import {
   SchoolSettings,
   BoardTopper,
   VMCLeader,
-  HouseInfo
+  HouseInfo,
+  BloodDonor,
+  BloodRequest
 } from '../types';
 
 export const SEED_SCHOOL_SETTINGS: SchoolSettings = {
@@ -1077,7 +1079,7 @@ export const SEED_DONATION_CAMPAIGNS: DonationCampaign[] = [
     id: 'camp-1',
     title: 'Silver Jubilee Alumni Corpus & Smart Science Center',
     category: 'Infrastructure',
-    description: 'Upgrading the Physics, Chemistry, and AI laboratories with modern digital sensor kits and sponsoring 50 merit student scholarships.',
+    description: 'Upgrading the Physics, Chemistry, Robotics, and AI laboratories with modern digital sensor kits, interactive displays, and high-speed research terminals.',
     targetAmount: 1500000,
     currentAmount: 980000,
     donorsCount: 164,
@@ -1085,6 +1087,216 @@ export const SEED_DONATION_CAMPAIGNS: DonationCampaign[] = [
     isActive: true,
     coverImage: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=600&h=350&fit=crop',
     createdAt: '2026-06-01T00:00:00Z'
+  },
+  {
+    id: 'camp-2',
+    title: 'Navodaya Pratibha Merit & Higher Education Scholarships',
+    category: 'Scholarship',
+    description: 'Direct financial assistance covering laptop grants, coaching fees, and initial hostel expenses for underprivileged rural students cracking IIT-JEE, NEET-UG, and CLAT.',
+    targetAmount: 800000,
+    currentAmount: 560000,
+    donorsCount: 92,
+    endDate: '2026-11-30',
+    isActive: true,
+    coverImage: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=600&h=350&fit=crop',
+    createdAt: '2026-07-01T00:00:00Z'
+  },
+  {
+    id: 'camp-3',
+    title: 'Emergency Medical Relief & Alumni Welfare Corpus Fund',
+    category: 'Emergency Welfare',
+    description: 'Rapid distress relief fund for alumni, teachers, and current students facing critical medical emergencies, accidents, or catastrophic life events.',
+    targetAmount: 1000000,
+    currentAmount: 740000,
+    donorsCount: 128,
+    endDate: '2026-12-31',
+    isActive: true,
+    coverImage: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=600&h=350&fit=crop',
+    createdAt: '2026-05-15T00:00:00Z'
+  },
+  {
+    id: 'camp-4',
+    title: 'Sports Equipment, Track & Floodlit Basketball Court',
+    category: 'Sports Kit',
+    description: 'Procurement of national-grade athletics gear, football kits, synthetic volleyball court mats, and floodlight installation for evening student matches.',
+    targetAmount: 500000,
+    currentAmount: 310000,
+    donorsCount: 54,
+    endDate: '2026-10-20',
+    isActive: true,
+    coverImage: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=600&h=350&fit=crop',
+    createdAt: '2026-07-20T00:00:00Z'
+  }
+];
+
+export const SEED_BLOOD_DONORS: BloodDonor[] = [
+  {
+    id: 'donor-1',
+    name: 'Dr. Prakash Rathore',
+    bloodGroup: 'O+',
+    batchYear: 2008,
+    city: 'Jaipur',
+    state: 'Rajasthan',
+    phone: '+91 98290 12345',
+    email: 'prakashinfosys1234@gmail.com',
+    lastDonatedDate: '2026-05-10',
+    isAvailable: true,
+    isVerified: true,
+    emergencyContactNote: 'Available 24/7 in Jaipur medical zone (SMS Hospital / Fortis / EHCC)',
+    createdAt: '2026-01-10T00:00:00Z'
+  },
+  {
+    id: 'donor-2',
+    name: 'Sunita Choudhary',
+    bloodGroup: 'B+',
+    batchYear: 2005,
+    city: 'Jodhpur',
+    state: 'Rajasthan',
+    phone: '+91 94140 54321',
+    email: 'sunita.ias@rajasthan.gov.in',
+    lastDonatedDate: '2026-04-18',
+    isAvailable: true,
+    isVerified: true,
+    emergencyContactNote: 'Available in Jodhpur and surrounding divisions for emergency SDP/RBC',
+    createdAt: '2026-02-12T00:00:00Z'
+  },
+  {
+    id: 'donor-3',
+    name: 'Vikram Singh Shekhawat',
+    bloodGroup: 'AB+',
+    batchYear: 2012,
+    city: 'Bengaluru',
+    state: 'Karnataka',
+    phone: '+91 98450 88231',
+    email: 'vikram.shekhawat@google.com',
+    lastDonatedDate: '2026-06-01',
+    isAvailable: true,
+    isVerified: true,
+    emergencyContactNote: 'Available for plateletes & whole blood in Whitefield / Indiranagar / Koramangala',
+    createdAt: '2026-03-01T00:00:00Z'
+  },
+  {
+    id: 'donor-4',
+    name: 'Mahesh Bhati',
+    bloodGroup: 'O-',
+    batchYear: 2018,
+    city: 'Barmer',
+    state: 'Rajasthan',
+    phone: '+91 96190 33412',
+    email: 'mahesh.bhati@hrrl.in',
+    lastDonatedDate: '2026-03-20',
+    isAvailable: true,
+    isVerified: true,
+    emergencyContactNote: 'Universal Rare O- Negative Donor. Can reach Balotra or Barmer District Hospital in 30 mins.',
+    createdAt: '2026-03-15T00:00:00Z'
+  },
+  {
+    id: 'donor-5',
+    name: 'Pooja Vishnoi',
+    bloodGroup: 'A+',
+    batchYear: 2015,
+    city: 'Balotra',
+    state: 'Rajasthan',
+    phone: '+91 94141 99221',
+    email: 'pooja@marwaragro.in',
+    lastDonatedDate: '2026-05-25',
+    isAvailable: true,
+    isVerified: true,
+    emergencyContactNote: 'Available in Balotra / Pachpadra town circle for hospital emergencies',
+    createdAt: '2026-04-05T00:00:00Z'
+  },
+  {
+    id: 'donor-6',
+    name: 'Major Arvind Kumar Soni',
+    bloodGroup: 'A-',
+    batchYear: 2006,
+    city: 'New Delhi',
+    state: 'Delhi',
+    phone: '+91 98110 44211',
+    email: 'arvind.soni.army@nic.in',
+    lastDonatedDate: '2026-04-02',
+    isAvailable: true,
+    isVerified: true,
+    emergencyContactNote: 'Available across Delhi NCR & Army R&R Hospital',
+    createdAt: '2026-04-12T00:00:00Z'
+  },
+  {
+    id: 'donor-7',
+    name: 'Narendra Singh Rathore',
+    bloodGroup: 'B-',
+    batchYear: 2010,
+    city: 'Ahmedabad',
+    state: 'Gujarat',
+    phone: '+91 97230 66543',
+    email: 'narendra.rathore@cadila.com',
+    lastDonatedDate: '2026-06-15',
+    isAvailable: true,
+    isVerified: true,
+    emergencyContactNote: 'Available for Civil Hospital & Apollo Hospital Ahmedabad emergency calls',
+    createdAt: '2026-05-01T00:00:00Z'
+  },
+  {
+    id: 'donor-8',
+    name: 'Kavita Rajpurohit',
+    bloodGroup: 'AB-',
+    batchYear: 2016,
+    city: 'Jaipur',
+    state: 'Rajasthan',
+    phone: '+91 94148 77654',
+    email: 'kavita.rajpurohit@aiims.edu',
+    lastDonatedDate: '2026-02-14',
+    isAvailable: true,
+    isVerified: true,
+    emergencyContactNote: 'Rare AB- Negative donor. Can be mobilized in Jaipur medical hub.',
+    createdAt: '2026-05-20T00:00:00Z'
+  }
+];
+
+export const SEED_BLOOD_REQUESTS: BloodRequest[] = [
+  {
+    id: 'req-1',
+    patientName: 'Master Rameshwar Ram (Navodaya Student Parent)',
+    bloodGroup: 'O-',
+    unitsNeeded: 2,
+    hospitalName: 'Govt. District Hospital & Trauma Center, Barmer',
+    city: 'Barmer',
+    contactPerson: 'Kailash Ram (Brother)',
+    contactPhone: '+91 94142 88190',
+    urgency: 'Immediate',
+    status: 'OPEN',
+    verifiedByNavodaya: true,
+    notes: 'Urgent requirement for surgical intervention following accident. Rare blood group needed on high priority.',
+    createdAt: '2026-08-16T14:30:00Z'
+  },
+  {
+    id: 'req-2',
+    patientName: 'Smt. Shanti Devi (Alumni Mother)',
+    bloodGroup: 'B+',
+    unitsNeeded: 3,
+    hospitalName: 'AIIMS Jodhpur, Blood Bank Ward 4',
+    city: 'Jodhpur',
+    contactPerson: 'Sunita Choudhary',
+    contactPhone: '+91 94140 54321',
+    urgency: 'Within 24 Hours',
+    status: 'OPEN',
+    verifiedByNavodaya: true,
+    notes: 'Required for scheduled cardiac bypass surgery tomorrow morning.',
+    createdAt: '2026-08-16T09:00:00Z'
+  },
+  {
+    id: 'req-3',
+    patientName: 'Dinesh Kumar (Batch 2014 Alumnus)',
+    bloodGroup: 'A+',
+    unitsNeeded: 2,
+    hospitalName: 'SMS Hospital, Dhanwantari Block, Jaipur',
+    city: 'Jaipur',
+    contactPerson: 'Dr. Prakash Rathore',
+    contactPhone: '+91 98290 12345',
+    urgency: 'Immediate',
+    status: 'FULFILLED',
+    verifiedByNavodaya: true,
+    notes: 'Emergency dengue platelet requirement — successfully fulfilled by Jaipur Navodaya donor chapter.',
+    createdAt: '2026-08-12T18:00:00Z'
   }
 ];
 

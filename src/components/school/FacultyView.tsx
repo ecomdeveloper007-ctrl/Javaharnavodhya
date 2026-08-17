@@ -34,9 +34,10 @@ export const FacultyView: React.FC = () => {
   const filteredFaculty = faculty.filter(f => {
     const matchesDept = selectedDept === 'All' || f.department === selectedDept;
     const matchesSearch =
-      f.name.toLowerCase().includes(facultySearch.toLowerCase()) ||
-      f.designation.toLowerCase().includes(facultySearch.toLowerCase()) ||
-      f.department.toLowerCase().includes(facultySearch.toLowerCase());
+      !facultySearch ||
+      (f.name && f.name.toLowerCase().includes(facultySearch.toLowerCase())) ||
+      (f.designation && f.designation.toLowerCase().includes(facultySearch.toLowerCase())) ||
+      (f.department && f.department.toLowerCase().includes(facultySearch.toLowerCase()));
     return matchesDept && matchesSearch;
   });
 

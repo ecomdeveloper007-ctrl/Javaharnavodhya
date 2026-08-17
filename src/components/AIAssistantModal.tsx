@@ -81,9 +81,9 @@ export const AIAssistantModal: React.FC<{ isOpen: boolean; onClose: () => void }
         reply = `Navodaya Vidyalaya Prarthana & Song:\n"हम नवोदय हो, हम नवोदय हो...\nप्रज्ञानं ब्रह्म की पावन ज्योति जलाते हैं...\nएक सूत्र में बंधे हुए भारत का मान बढ़ाते हैं।"\n\nJNV Pachpadra (Barmer) was established in 1993 and continues to foster unity and academic excellence.`;
       } else {
         const matchAlumni = alumni.filter(a =>
-          a.fullName.toLowerCase().includes(lower) ||
-          a.profession.toLowerCase().includes(lower) ||
-          a.city.toLowerCase().includes(lower)
+          (a.fullName && a.fullName.toLowerCase().includes(lower)) ||
+          (a.profession && a.profession.toLowerCase().includes(lower)) ||
+          (a.city && a.city.toLowerCase().includes(lower))
         );
 
         if (matchAlumni.length > 0) {

@@ -44,6 +44,8 @@ export interface Translations {
   businessDirectory: string;
   memoriesWall: string;
   welfareAid: string;
+  donationPortal: string;
+  bloodDonationPortal: string;
 
   // Hero Section
   heroBadge: string;
@@ -131,11 +133,13 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     batchRosters: "Batch Rosters",
     reunionsEvents: "Reunions & RSVPs",
     liveElections: "Live Elections",
-    financialLedger: "Financial Ledger & Donations",
+    financialLedger: "Financial Ledger & Transparency",
     careersJobs: "Careers & Job Board",
     businessDirectory: "Alumni Businesses",
     memoriesWall: "Memories & Archive",
     welfareAid: "Alumni Welfare Fund",
+    donationPortal: "Donation & 80G Portal",
+    bloodDonationPortal: "Blood Lifeline Network",
 
     // Hero Section
     heroBadge: "Excellence in Rural Education Since 1993",
@@ -227,6 +231,8 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     businessDirectory: "पूर्व छात्र व्यापार डायरेक्टरी",
     memoriesWall: "यादें एवं पुरातन दीर्घा",
     welfareAid: "पूर्व छात्र कल्याण कोष",
+    donationPortal: "दान एवं 80G पोर्टल",
+    bloodDonationPortal: "रक्तदान जीवनदान नेटवर्क",
 
     // Hero Section
     heroBadge: "वर्ष 1993 से ग्रामीण प्रतिभाओं का पथ प्रदर्शक",

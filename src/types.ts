@@ -126,16 +126,54 @@ export interface DonationCampaign {
   createdAt: string;
 }
 
+export type BloodGroup = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
+
+export interface BloodDonor {
+  id: string;
+  name: string;
+  bloodGroup: BloodGroup;
+  batchYear: number;
+  city: string;
+  state: string;
+  phone: string;
+  email: string;
+  lastDonatedDate?: string;
+  isAvailable: boolean;
+  isVerified: boolean;
+  emergencyContactNote?: string;
+  createdAt: string;
+}
+
+export interface BloodRequest {
+  id: string;
+  patientName: string;
+  bloodGroup: BloodGroup;
+  unitsNeeded: number;
+  hospitalName: string;
+  city: string;
+  contactPerson: string;
+  contactPhone: string;
+  urgency: 'Immediate' | 'Within 24 Hours' | 'Planned';
+  status: 'OPEN' | 'FULFILLED' | 'CLOSED';
+  verifiedByNavodaya: boolean;
+  notes?: string;
+  createdAt: string;
+}
+
 export interface DonationRecord {
   id: string;
-  campaignId: string;
+  campaignId?: string;
   campaignTitle: string;
   donorName: string;
   donorEmail: string;
+  donorPhone?: string;
+  donorPan?: string;
   donorBatch?: number;
   amount: number;
-  paymentMode: 'UPI' | 'Card' | 'NetBanking';
+  paymentMode: 'UPI' | 'Card' | 'NetBanking' | 'Direct Bank Transfer';
   transactionRef: string;
+  receiptNumber: string;
+  taxExempt80GRegNo: string;
   paymentStatus: 'SUCCESS' | 'PENDING';
   isAnonymous: boolean;
   note?: string;

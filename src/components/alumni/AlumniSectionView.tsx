@@ -32,6 +32,9 @@ import { AlumniProfile } from '../../types';
 import { ImageWithFallback } from '../common/ImageWithFallback';
 import { SchoolEventsView } from '../school/SchoolEventsView';
 import { FinancialTransparencyView } from '../school/FinancialTransparencyView';
+import { DonationPortalView } from '../donations/DonationPortalView';
+import { BloodDonationView } from '../blood/BloodDonationView';
+import { Droplet, HeartHandshake, Receipt } from 'lucide-react';
 
 export const AlumniSectionView: React.FC = () => {
   const {
@@ -71,10 +74,11 @@ export const AlumniSectionView: React.FC = () => {
   // Filtered Alumni list
   const filteredAlumni = alumni.filter(a => {
     const matchesSearch =
-      a.fullName.toLowerCase().includes(directorySearch.toLowerCase()) ||
-      a.email.toLowerCase().includes(directorySearch.toLowerCase()) ||
-      a.profession.toLowerCase().includes(directorySearch.toLowerCase()) ||
-      a.city.toLowerCase().includes(directorySearch.toLowerCase()) ||
+      !directorySearch ||
+      (a.fullName && a.fullName.toLowerCase().includes(directorySearch.toLowerCase())) ||
+      (a.email && a.email.toLowerCase().includes(directorySearch.toLowerCase())) ||
+      (a.profession && a.profession.toLowerCase().includes(directorySearch.toLowerCase())) ||
+      (a.city && a.city.toLowerCase().includes(directorySearch.toLowerCase())) ||
       (a.company && a.company.toLowerCase().includes(directorySearch.toLowerCase()));
 
     const matchesBatch = selectedBatchFilter === 'All' || String(a.batchYear) === selectedBatchFilter;
@@ -249,6 +253,30 @@ export const AlumniSectionView: React.FC = () => {
           >
             <Compass className="w-4 h-4" />
             <span>Welfare & Giving Back</span>
+          </button>
+
+          <button
+            onClick={() => setActiveAlumniSubTab('donations')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center space-x-2 ${
+              activeAlumniSubTab === 'donations'
+                ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
+                : 'text-amber-700 bg-amber-50/70 hover:bg-amber-100 hover:text-amber-900 border border-amber-200'
+            }`}
+          >
+            <Receipt className="w-4 h-4 text-amber-600" />
+            <span>80G Donation Portal</span>
+          </button>
+
+          <button
+            onClick={() => setActiveAlumniSubTab('blood')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center space-x-2 ${
+              activeAlumniSubTab === 'blood'
+                ? 'bg-rose-600 text-white font-bold shadow-xs'
+                : 'text-rose-700 bg-rose-50/70 hover:bg-rose-100 hover:text-rose-900 border border-rose-200'
+            }`}
+          >
+            <Droplet className="w-4 h-4 text-rose-500 fill-rose-500" />
+            <span>Blood Lifeline Network</span>
           </button>
         </div>
       </div>
@@ -677,6 +705,20 @@ export const AlumniSectionView: React.FC = () => {
               </motion.div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* SUBTAB 7: 80G DONATION PORTAL */}
+      {activeAlumniSubTab === 'donations' && (
+        <div className="pt-2">
+          <DonationPortalView />
+        </div>
+      )}
+
+      {/* SUBTAB 8: BLOOD LIFELINE NETWORK */}
+      {activeAlumniSubTab === 'blood' && (
+        <div className="pt-2">
+          <BloodDonationView />
         </div>
       )}
 

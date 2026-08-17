@@ -22,7 +22,10 @@ import { GalleryView } from './components/school/GalleryView';
 import { ContactView } from './components/school/ContactView';
 import { FinancialTransparencyView } from './components/school/FinancialTransparencyView';
 import { AlumniSectionView } from './components/alumni/AlumniSectionView';
+import { DonationPortalView } from './components/donations/DonationPortalView';
+import { BloodDonationView } from './components/blood/BloodDonationView';
 import { AdminDashboard } from './components/admin/AdminDashboard';
+import { DonationReceiptModal } from './components/DonationReceiptModal';
 
 const AppContent: React.FC = () => {
   const { activeTab, setActiveTab } = useData();
@@ -56,6 +59,8 @@ const AppContent: React.FC = () => {
               {activeTab === 'contact' && <ContactView />}
               {activeTab === 'financials' && <FinancialTransparencyView />}
               {activeTab === 'alumni' && <AlumniSectionView />}
+              {activeTab === 'donations' && <DonationPortalView />}
+              {activeTab === 'blood-donation' && <BloodDonationView />}
               {activeTab === 'admin' && <AdminDashboard onClose={() => setActiveTab('alumni')} />}
             </motion.div>
           </AnimatePresence>
@@ -66,6 +71,7 @@ const AppContent: React.FC = () => {
       <AboutSchoolModal />
       <RegistrationModal />
       <AuthModal />
+      <DonationReceiptModal />
       <AIAssistantModal isOpen={isAIChatOpen} onClose={() => setIsAIChatOpen(false)} />
 
       {/* Institutional Multi-Column Footer */}

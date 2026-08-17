@@ -27,7 +27,10 @@ import {
   SchoolSettings,
   BoardTopper,
   VMCLeader,
-  HouseInfo
+  HouseInfo,
+  BloodDonor,
+  BloodRequest,
+  BloodGroup
 } from '../types';
 import {
   SEED_ALUMNI,
@@ -36,6 +39,8 @@ import {
   SEED_JOBS,
   SEED_WELFARE_CASES,
   SEED_DONATION_CAMPAIGNS,
+  SEED_BLOOD_DONORS,
+  SEED_BLOOD_REQUESTS,
   SEED_TRANSACTIONS,
   SEED_FINANCIAL_REPORTS,
   SEED_EVENTS,
@@ -58,10 +63,12 @@ import {
 import { auth, signInWithGoogle, logoutUser, AuthErrorDetails, db } from '../firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 
-interface CSVImportResult {
+export interface CSVImportResult {
   success: boolean;
   importedCount: number;
+  updatedCount: number;
   duplicateCount: number;
+  totalProcessed: number;
   errors: string[];
   message: string;
 }
@@ -158,7 +165,18 @@ interface DataContextType {
   updateDonationCampaign: (id: string, updates: Partial<DonationCampaign>) => void;
   deleteDonationCampaign: (id: string) => void;
   donationRecords: DonationRecord[];
-  recordDonation: (donation: Omit<DonationRecord, 'id' | 'createdAt' | 'paymentStatus' | 'transactionRef'>) => DonationRecord;
+  recordDonation: (donation: Omit<DonationRecord, 'id' | 'createdAt' | 'paymentStatus' | 'transactionRef' | 'receiptNumber' | 'taxExempt80GRegNo'>) => DonationRecord;
+
+  // Blood Donation Lifeline Network
+  bloodDonors: BloodDonor[];
+  addBloodDonor: (donor: Omit<BloodDonor, 'id' | 'createdAt' | 'isVerified'>) => void;
+  updateBloodDonor: (id: string, updates: Partial<BloodDonor>) => void;
+  deleteBloodDonor: (id: string) => void;
+  toggleBloodDonorAvailability: (id: string) => void;
+  bloodRequests: BloodRequest[];
+  submitBloodRequest: (req: Omit<BloodRequest, 'id' | 'createdAt' | 'status' | 'verifiedByNavodaya'>) => void;
+  updateBloodRequestStatus: (id: string, status: BloodRequest['status']) => void;
+  deleteBloodRequest: (id: string) => void;
 
   // Memories & Nostalgia
   memories: AlumniMemory[];
@@ -212,7 +230,7 @@ interface DataContextType {
 
   // CSV Import & Export Suite
   exportToCSV: (moduleType: string, customRows?: any[]) => void;
-  importFromCSV: (moduleType: string, csvContent: string) => CSVImportResult;
+  importFromCSV: (moduleType: string, csvContent: string, updateExisting?: boolean) => CSVImportResult;
   getCSVTemplate: (moduleType: string) => string;
 
   // System & Reset
@@ -284,6 +302,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [welfareCases, setWelfareCases] = useState<WelfareCase[]>(SEED_WELFARE_CASES);
   const [donationCampaigns, setDonationCampaigns] = useState<DonationCampaign[]>(SEED_DONATION_CAMPAIGNS);
   const [donationRecords, setDonationRecords] = useState<DonationRecord[]>([]);
+  const [bloodDonors, setBloodDonors] = useState<BloodDonor[]>(SEED_BLOOD_DONORS);
+  const [bloodRequests, setBloodRequests] = useState<BloodRequest[]>(SEED_BLOOD_REQUESTS);
   const [memories, setMemories] = useState<AlumniMemory[]>(SEED_MEMORIES);
   const [achievements, setAchievements] = useState<Achievement[]>(SEED_ACHIEVEMENTS);
 
@@ -307,7 +327,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const mappedRole = userRolesMap[userEmail] || userRolesMap[fbUser.uid];
         const assignedRole: UserRole = isSuperAdminEmail ? 'super_admin' : (mappedRole || 'alumnus');
         const isAuthorizedAdmin = assignedRole === 'super_admin' || assignedRole === 'alumni_manager' || assignedRole === 'election_officer' || assignedRole === 'auditor' || assignedRole === 'principal';
-        const existingProfile = alumni.find(a => a.email.toLowerCase() === userEmail);
+        const existingProfile = alumni.find(a => (a.email || '').toLowerCase() === userEmail);
         
         setUser({
           uid: fbUser.uid,
@@ -330,13 +350,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Role Assignment
   const assignUserRole = (alumniIdOrEmail: string, role: UserRole) => {
-    const key = alumniIdOrEmail.toLowerCase().trim();
+    const key = (alumniIdOrEmail || '').toLowerCase().trim();
     setUserRolesMap(prev => ({
       ...prev,
       [key]: role
     }));
 
-    if (user && (user.uid === alumniIdOrEmail || user.email?.toLowerCase().trim() === key)) {
+    if (user && (user.uid === alumniIdOrEmail || (user.email || '').toLowerCase().trim() === key)) {
       const isSuperAdmin = key === 'prakashinfosys1234@gmail.com' || role === 'super_admin';
       const isAuthorizedAdmin = isSuperAdmin || role === 'alumni_manager' || role === 'election_officer' || role === 'auditor' || role === 'principal';
       setUser(prev => prev ? { ...prev, role, isAdmin: isAuthorizedAdmin } : null);
@@ -347,7 +367,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // RBAC Permission Helper
   const hasPermission = (permission: string): boolean => {
     if (!user) return false;
-    const isSuperAdmin = user.email?.toLowerCase().trim() === 'prakashinfosys1234@gmail.com' || user.role === 'super_admin' || currentRole === 'super_admin';
+    const isSuperAdmin = (user.email || '').toLowerCase().trim() === 'prakashinfosys1234@gmail.com' || user.role === 'super_admin' || currentRole === 'super_admin';
     if (isSuperAdmin) return true;
     const activeRole = user.role || currentRole;
     const roleObj = SEED_ROLES_PERMISSIONS.find(r => r.role === activeRole || r.role === currentRole);
@@ -364,7 +384,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const mappedRole = userRolesMap[userEmail] || userRolesMap[fbUser.uid];
         const assignedRole: UserRole = isSuperAdminEmail ? 'super_admin' : (mappedRole || 'alumnus');
         const isAuthorizedAdmin = isSuperAdminEmail || assignedRole === 'super_admin' || assignedRole === 'alumni_manager' || assignedRole === 'election_officer' || assignedRole === 'auditor' || assignedRole === 'principal';
-        const existingProfile = alumni.find(a => a.email.toLowerCase() === userEmail);
+        const existingProfile = alumni.find(a => (a.email || '').toLowerCase() === userEmail);
 
         setUser({
           uid: fbUser.uid,
@@ -387,7 +407,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginDirectlyAsSuperAdmin = () => {
     const superAdminEmail = 'prakashinfosys1234@gmail.com';
-    const existingProfile = alumni.find(a => a.email.toLowerCase() === superAdminEmail);
+    const existingProfile = alumni.find(a => (a.email || '').toLowerCase() === superAdminEmail);
 
     setUser({
       uid: 'prakash-super-admin-uid',
@@ -404,13 +424,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginDirectlyAs = (emailOrId: string, roleOverride?: UserRole) => {
-    const key = emailOrId.toLowerCase().trim();
-    let alum = alumni.find(a => a.id === emailOrId || a.email.toLowerCase() === key);
+    const key = (emailOrId || '').toLowerCase().trim();
+    let alum = alumni.find(a => a.id === emailOrId || (a.email || '').toLowerCase() === key);
     if (!alum) {
       alum = alumni[0];
     }
 
-    const assignedRole: UserRole = roleOverride || (alum.email === 'prakashinfosys1234@gmail.com' ? 'super_admin' : (userRolesMap[alum.email.toLowerCase()] || 'alumnus'));
+    const alumEmail = (alum.email || '').toLowerCase();
+    const assignedRole: UserRole = roleOverride || (alum.email === 'prakashinfosys1234@gmail.com' ? 'super_admin' : (userRolesMap[alumEmail] || 'alumnus'));
     const isSuperAdmin = alum.email === 'prakashinfosys1234@gmail.com' || assignedRole === 'super_admin';
     const isAuthorizedAdmin = isSuperAdmin || assignedRole === 'alumni_manager' || assignedRole === 'election_officer' || assignedRole === 'auditor' || assignedRole === 'principal';
 
@@ -882,8 +903,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const getUserRSVP = (eventId: string, userIdOrEmail: string): EventRSVP | undefined => {
+    const key = (userIdOrEmail || '').toLowerCase();
     return eventRsvps.find(
-      r => r.eventId === eventId && (r.userId === userIdOrEmail || r.userEmail.toLowerCase() === userIdOrEmail.toLowerCase())
+      r => r.eventId === eventId && (r.userId === userIdOrEmail || (r.userEmail && r.userEmail.toLowerCase() === key))
     );
   };
 
@@ -911,8 +933,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, message: 'Please sign in with a verified alumni account to submit a nomination.' };
     }
 
+    const targetCandEmail = (nomData.candidateEmail || '').toLowerCase();
     const duplicate = nominations.find(
-      n => n.electionId === nomData.electionId && n.positionId === nomData.positionId && n.candidateEmail.toLowerCase() === nomData.candidateEmail.toLowerCase()
+      n => n.electionId === nomData.electionId && n.positionId === nomData.positionId && (n.candidateEmail && n.candidateEmail.toLowerCase() === targetCandEmail)
     );
 
     if (duplicate) {
@@ -1040,7 +1063,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hasUserVotedForPosition = (positionId: string): boolean => {
     if (!user) return false;
-    return votes.some(v => v.positionId === positionId && (v.voterUid === user.uid || v.voterEmail.toLowerCase() === user.email?.toLowerCase()));
+    const userEmail = (user.email || '').toLowerCase();
+    return votes.some(v => v.positionId === positionId && (v.voterUid === user.uid || (v.voterEmail && v.voterEmail.toLowerCase() === userEmail)));
   };
 
   const castVote = (electionId: string, positionId: string, candidateId: string): { success: boolean; message: string } => {
@@ -1137,28 +1161,37 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLedgerTransactions(prev => prev.filter(t => t.id !== id));
   };
 
-  const recordDonation = (donationData: Omit<DonationRecord, 'id' | 'createdAt' | 'paymentStatus' | 'transactionRef'>): DonationRecord => {
+  const recordDonation = (donationData: Omit<DonationRecord, 'id' | 'createdAt' | 'paymentStatus' | 'transactionRef' | 'receiptNumber' | 'taxExempt80GRegNo'>): DonationRecord => {
+    const currentYear = new Date().getFullYear();
+    const nextYearSuffix = (currentYear + 1).toString().slice(-2);
+    const randomSeq = Math.floor(1000 + Math.random() * 9000);
+    const txnCode = Math.floor(100000 + Math.random() * 900000);
+
     const newRecord: DonationRecord = {
       ...donationData,
       id: `don-${Date.now()}`,
+      receiptNumber: `80G/JNVPAA/${currentYear}-${nextYearSuffix}/${randomSeq}`,
+      taxExempt80GRegNo: 'CIT(E)/JNVPAA/80G/2012-13/894',
+      transactionRef: `JNV80G-${txnCode}`,
       paymentStatus: 'SUCCESS',
-      transactionRef: `JNV-TXN-${Math.floor(100000 + Math.random() * 900000)}`,
       createdAt: new Date().toISOString()
     };
 
     setDonationRecords(prev => [newRecord, ...prev]);
 
-    setDonationCampaigns(prev =>
-      prev.map(c =>
-        c.id === donationData.campaignId
-          ? {
-              ...c,
-              currentAmount: c.currentAmount + donationData.amount,
-              donorsCount: c.donorsCount + 1
-            }
-          : c
-      )
-    );
+    if (donationData.campaignId) {
+      setDonationCampaigns(prev =>
+        prev.map(c =>
+          c.id === donationData.campaignId
+            ? {
+                ...c,
+                currentAmount: c.currentAmount + donationData.amount,
+                donorsCount: c.donorsCount + 1
+              }
+            : c
+        )
+      );
+    }
 
     const ledgerEntry: FinancialTransaction = {
       id: `tx-don-${Date.now()}`,
@@ -1166,16 +1199,59 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       type: 'CREDIT',
       category: 'Donations',
       amount: donationData.amount,
-      description: `Donation towards ${donationData.campaignTitle}`,
+      description: `80G Tax-Exempt Contribution towards ${donationData.campaignTitle || 'General Welfare Corpus'}`,
       date: new Date().toISOString().split('T')[0],
       visibility: 'public',
-      auditedBy: 'CA Devendra Saini',
-      payeeOrDonor: donationData.isAnonymous ? 'Anonymous Well-Wisher' : donationData.donorName
+      auditedBy: 'CA Devendra Saini (Statutory Auditor)',
+      payeeOrDonor: donationData.isAnonymous ? 'Anonymous Well-Wisher' : `${donationData.donorName}${donationData.donorPan ? ` (PAN: ${donationData.donorPan})` : ''}`
     };
     setLedgerTransactions(prev => [ledgerEntry, ...prev]);
 
     setLastGeneratedReceipt(newRecord);
+    setIsDonationModalOpen(true);
     return newRecord;
+  };
+
+  // Blood Donation Lifeline Methods
+  const addBloodDonor = (donor: Omit<BloodDonor, 'id' | 'createdAt' | 'isVerified'>) => {
+    const newDonor: BloodDonor = {
+      ...donor,
+      id: `donor-${Date.now()}`,
+      isVerified: true,
+      createdAt: new Date().toISOString()
+    };
+    setBloodDonors(prev => [newDonor, ...prev]);
+  };
+
+  const updateBloodDonor = (id: string, updates: Partial<BloodDonor>) => {
+    setBloodDonors(prev => prev.map(d => (d.id === id ? { ...d, ...updates } : d)));
+  };
+
+  const deleteBloodDonor = (id: string) => {
+    setBloodDonors(prev => prev.filter(d => d.id !== id));
+  };
+
+  const toggleBloodDonorAvailability = (id: string) => {
+    setBloodDonors(prev => prev.map(d => (d.id === id ? { ...d, isAvailable: !d.isAvailable } : d)));
+  };
+
+  const submitBloodRequest = (req: Omit<BloodRequest, 'id' | 'createdAt' | 'status' | 'verifiedByNavodaya'>) => {
+    const newReq: BloodRequest = {
+      ...req,
+      id: `req-${Date.now()}`,
+      status: 'OPEN',
+      verifiedByNavodaya: true,
+      createdAt: new Date().toISOString()
+    };
+    setBloodRequests(prev => [newReq, ...prev]);
+  };
+
+  const updateBloodRequestStatus = (id: string, status: BloodRequest['status']) => {
+    setBloodRequests(prev => prev.map(r => (r.id === id ? { ...r, status } : r)));
+  };
+
+  const deleteBloodRequest = (id: string) => {
+    setBloodRequests(prev => prev.filter(r => r.id !== id));
   };
 
   // Reset to default seed data
@@ -1195,6 +1271,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setWelfareCases(SEED_WELFARE_CASES);
     setDonationCampaigns(SEED_DONATION_CAMPAIGNS);
     setDonationRecords([]);
+    setBloodDonors(SEED_BLOOD_DONORS);
+    setBloodRequests(SEED_BLOOD_REQUESTS);
     setMemories(SEED_MEMORIES);
     setAchievements(SEED_ACHIEVEMENTS);
     setEvents(SEED_EVENTS);
@@ -1211,19 +1289,79 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const getCSVTemplate = (moduleType: string): string => {
     switch (moduleType) {
       case 'alumni':
-        return `fullName,batchYear,email,phone,house,city,state,country,profession,company,designation,industry,bloodGroup,bio\n"Ravi Sharma",2012,"ravi.sharma@example.com","+91 9876543210","Aravali","Jaipur","Rajasthan","India","Software Engineer","Infosys","Senior Dev","IT","B+","Alumnus bio"`;
-      case 'events':
-        return `title,category,date,time,location,isOnline,isAlumniEvent,maxCapacity,description\n"Regional Alumni Gathering","Chapter Meet","2026-11-20","06:00 PM IST","Barmer Club",false,true,100,"Annual meetup description"`;
-      case 'financial_reports':
-        return `title,financialYear,category,reportSummary,visibility,auditorName,amountAudited\n"Annual Balance Sheet 2025","2024-2025","Balance Sheet","Comprehensive statutory audit statement","public","CA Saini",5000000`;
-      case 'ledger':
-        return `transactionId,type,category,amount,description,date,visibility,auditedBy,payeeOrDonor\n"TXN-2026-0901","CREDIT","Donations",50000,"Smart Lab Contribution","2026-08-14","public","CA Saini","Batch 2012"`;
-      case 'notices':
-        return `title,category,publishDate,targetAudience,content,isPinned,referenceNo\n"Holiday Notice","General","2026-08-15","All","School holiday notice content",false,"JNV/PACH/2026/99"`;
+        return `fullName,batchYear,email,phone,house,city,state,country,profession,company,designation,industry,bloodGroup,bio,isMentorAvailable,isBusinessOwner,isLookingForJobs,isHiring,verificationStatus
+"Ravi Sharma",2012,"ravi.sharma@example.com","+91 9876543210","Aravali","Jaipur","Rajasthan","India","Software Architect","Infosys","Lead Architect","IT & Software","B+","Senior technology leader mentoring JNV students.",true,false,false,true,"verified"
+"Dr. Sneha Rathore",2008,"sneha.rathore@medcare.org","+91 9823456789","Nilgiri","Jodhpur","Rajasthan","India","Cardiologist","AIIMS Jodhpur","Associate Professor","Healthcare","O+","Cardiology specialist offering medical guidance.",true,false,false,false,"verified"
+"Prakash Gehlot",2015,"prakash.gehlot@marwarinfra.in","+91 9845123456","Shivalik","Balotra","Rajasthan","India","Civil Engineer & Entrepreneur","Marwar Infra Ltd","Director","Construction & Infrastructure","A+","Dedicated to regional development and alumni projects.",false,true,false,true,"verified"`;
+
       case 'faculty':
-        return `name,designation,department,qualification,experienceYears,email\n"Dr. K.L. Sharma","PGT Physics","Physics","M.Sc., Ph.D.",15,"kl.physics@jnv.in"`;
+        return `name,designation,department,qualification,experienceYears,email,phone
+"Dr. K.L. Sharma","PGT Physics","Physics","M.Sc. Physics, Ph.D., B.Ed.",16,"kl.physics@jnvpachpadra.edu.in","+91 9414123456"
+"Smt. Ananya Trivedi","PGT Biology","Biology","M.Sc. Zoology, B.Ed., CTET",12,"ananya.biology@jnvpachpadra.edu.in","+91 9414234567"
+"Shri R.K. Meena","TGT Mathematics","Mathematics","M.Sc. Mathematics, B.Ed.",8,"rk.maths@jnvpachpadra.edu.in","+91 9414345678"`;
+
+      case 'notices':
+        return `title,category,publishDate,targetAudience,content,isPinned,referenceNo
+"Alumni Grand Reunion & AGM 2026","Alumni","2026-09-15","All","Notice is hereby given for the Annual General Meeting and Grand Reunion celebration at school campus. All alumni are cordially invited.",true,"JNV/PACH/ALUM/2026/102"
+"JNVST Class VI Entrance Exam 2027 Admissions Open","Admissions","2026-08-20","Public","Navodaya Vidyalaya Samiti invites online applications for Jawahar Navodaya Vidyalaya Selection Test (JNVST) for Class VI admission.",true,"JNV/PACH/ADM/2026/45"
+"Inter-House Athletics & Sports Championship Fixtures","Sports","2026-10-05","Students","Annual Inter-House Sports Championship scheduled from Oct 10 to 14. House captains to finalize team rosters by Oct 7.",false,"JNV/PACH/SPT/2026/18"`;
+
+      case 'events':
+        return `title,category,date,time,location,isOnline,isAlumniEvent,maxCapacity,description
+"Silver Jubilee Batch Reunion (1998-2005)","Reunion","2026-12-25","10:00 AM IST","JNV Campus Auditorium",false,true,300,"Milestone silver jubilee batch reunion with school tour, cultural nostalgia and felicitations."
+"Career Mentorship & Guidance Summit 2026","Career","2026-11-14","02:00 PM IST","Google Meet Virtual Hall",true,true,500,"Distinguished alumni panel interactive mentoring session for Class 10th to 12th students."
+"Navodaya Sports Meet & Marathon 2026","Sports","2026-11-28","07:00 AM IST","Balotra Stadium",false,true,250,"Community marathon and alumni vs school students cricket and football tournament."`;
+
+      case 'ledger':
+        return `transactionId,type,category,amount,description,date,visibility,auditedBy,payeeOrDonor
+"TXN-2026-0810","CREDIT","Donations",150000,"Smart Science Lab Equipment Grant","2026-08-10","public","CA R.K. Saini (FCA #087412)","Batch 2010 Alumni Trust"
+"TXN-2026-0815","DEBIT","Student Welfare",45000,"Merit Scholarship Disbursements for 10 Students","2026-08-15","public","CA R.K. Saini (FCA #087412)","JNV Principal Office"
+"TXN-2026-0820","CREDIT","Membership Fee",85000,"Annual PAA Lifetime Membership Collections","2026-08-20","public","CA R.K. Saini (FCA #087412)","General Alumni"`;
+
+      case 'financial_reports':
+        return `title,financialYear,category,reportSummary,visibility,auditorName,amountAudited
+"Statutory Annual Audit Report FY 2025-26","2025-2026","Annual Audit Report","Comprehensive statutory audited statement of alumni association fund operations with zero non-compliances.","public","CA R.K. Saini (FCA #087412)",4850000
+"Mid-Term Balance Sheet & Fund Utilization Q2","2025-2026","Balance Sheet","Half-yearly reviewed summary of receipts, bank balances, and welfare project disbursements.","public","Internal Audit Board",2400000`;
+
+      case 'toppers':
+        return `name,exam,stream,percentage,year,currentPursuit,photoUrl
+"Priya Choudhary","CBSE Class XII","Science (PCM + CS)",98.4,2025,"B.Tech CSE at IIT Delhi","https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop"
+"Rahul Soni","CBSE Class XII","Science (PCB + Biotech)",97.8,2025,"MBBS at AIIMS Jodhpur","https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&h=400&fit=crop"
+"Vikas Patel","CBSE Class X AISSE","All Subjects",99.0,2025,"Class XI Science at JNV Pachpadra","https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop"`;
+
+      case 'blood_donors':
+        return `fullName,bloodGroup,city,state,phone,email,batchYear,lastDonatedDate,isAvailable,hospitalOrArea
+"Amit Kumar","O+","Balotra","Rajasthan","+91 9414556677","amit.k@gmail.com",2014,"2026-05-10",true,"Balotra Civil Hospital"
+"Deepak Jain","B+","Jodhpur","Rajasthan","+91 9414667788","deepak.j@gmail.com",2011,"2026-06-15",true,"AIIMS & MDM Hospital Jodhpur"
+"Sunita Verma","AB+","Jaipur","Rajasthan","+91 9414778899","sunita.v@gmail.com",2016,"2026-04-20",true,"SMS Medical College Hospital Jaipur"`;
+
+      case 'vmc_members':
+        return `name,designation,organization,phone,email
+"District Magistrate / Collector","Chairman VMC","Dist. Administration Balotra / Barmer","+91 2982 220001","dm-balotra@rajasthan.gov.in"
+"Principal JNV Pachpadra","Member Secretary","JNV Pachpadra","+91 2988 222111","principal-jnvpachpadra@gov.in"
+"Executive Engineer PWD","Member (Civil Works)","Public Works Department","+91 2988 222333","ee-pwd-balotra@rajasthan.gov.in"
+"Chief Medical & Health Officer (CMHO)","Member (Health)","Medical & Health Services","+91 2988 222444","cmho-balotra@rajasthan.gov.in"`;
+
+      case 'donation_campaigns':
+        return `title,category,targetAmount,currentAmount,donorCount,status,endDate,description
+"Digital Science Lab Modernization 2026","Infrastructure",500000,320000,45,"Active","2026-12-31","Equipping campus science labs with interactive digital screens, IoT robotics kits, and apparatus."
+"Underprivileged Student Merit Scholarship 2026","Scholarship",300000,210000,28,"Active","2026-10-31","Providing higher education stipends and books for financially vulnerable meritorious graduates."
+"Campus Solar Green Power Initiative","Campus Upgrades",450000,180000,34,"Active","2026-11-30","Installing 25kW rooftop solar panels for round-the-clock clean electricity in school hostels."`;
+
+      case 'jobs':
+        return `title,company,location,employmentType,experience,salaryRange,description,applyLinkOrEmail,postedByName,postedByBatch,postedByEmail
+"Senior Full Stack Developer","TechVeda Labs","Remote / Bangalore","Full-Time","3-5 Years","18 - 25 LPA","Looking for React + Node.js engineer with microservices expertise.","careers@techvedalabs.com","Harish Sharma",2013,"harish@techvedalabs.com"
+"Civil Site Engineer","Marwar Infra Ltd","Balotra / Barmer","Full-Time","2+ Years","6 - 9 LPA","Supervision of commercial and institutional construction projects.","apply@marwarinfra.in","Ramesh Patel",2010,"ramesh@marwarinfra.in"
+"Marketing & Growth Specialist","EdTech Innovators","Jaipur / Hybrid","Full-Time","1-3 Years","5 - 8 LPA","B2B sales and academic institutional relationship management.","jobs@edtech.in","Kavita Bishnoi",2017,"kavita@edtech.in"`;
+
+      case 'businesses':
+        return `name,category,ownerName,ownerBatch,ownerEmail,ownerPhone,website,description,isVerified,city,discountForAlumni
+"Marwar Solar & Green Energy","Renewable Energy","Suresh Gehlot",2009,"suresh@marwarsolar.in","+91 9829012345","https://marwarsolar.in","Rooftop solar installation & maintenance services.",true,"Balotra","10% discount on residential solar systems"
+"Desert Oasis Organic Farms","Agriculture & Food","Manish Bishnoi",2012,"manish@desertoasis.in","+91 9829023456","https://desertoasis.in","Pure A2 Desi cow ghee, organic bajra & indigenous spices.",true,"Barmer","15% off for verified JNV Alumni"
+"Balotra Diagnostics & PathLab","Healthcare","Dr. Pooja Sharma",2011,"pooja@balotradiagnostics.com","+91 9829034567","https://balotradiagnostics.com","NABL accredited automated pathology and radiology center.",true,"Balotra","20% concession on comprehensive health packages"`;
+
       default:
-        return 'id,title,description';
+        return 'id,title,description\n"1","Sample Title","Sample Description"';
     }
   };
 
@@ -1255,6 +1393,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           break;
         case 'faculty':
           rows = faculty;
+          break;
+        case 'toppers':
+          rows = toppers;
+          break;
+        case 'blood_donors':
+          rows = bloodDonors;
+          break;
+        case 'vmc_members':
+          rows = vmcMembers;
+          break;
+        case 'donation_campaigns':
+          rows = donationCampaigns;
+          break;
+        case 'jobs':
+          rows = jobs;
+          break;
+        case 'businesses':
+          rows = businesses;
           break;
         case 'elections':
           rows = election.positions.flatMap(p => p.candidates.map(c => ({ position: p.title, candidateName: c.name, batch: c.batch, votes: c.votes })));
@@ -1319,15 +1475,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return result;
   };
 
-  const importFromCSV = (moduleType: string, csvContent: string): CSVImportResult => {
+  const importFromCSV = (moduleType: string, csvContent: string, updateExisting: boolean = true): CSVImportResult => {
     const lines = csvContent.trim().split(/\r?\n/).filter(l => l.trim().length > 0);
     if (lines.length < 2) {
-      return { success: false, importedCount: 0, duplicateCount: 0, errors: ['CSV file is empty or missing data rows.'], message: 'File has no content.' };
+      return { success: false, importedCount: 0, updatedCount: 0, duplicateCount: 0, totalProcessed: 0, errors: ['CSV file is empty or missing data rows.'], message: 'File has no content.' };
     }
 
     const headers = parseCSVLine(lines[0]).map(h => h.replace(/^["']|["']$/g, '').trim());
     const dataLines = lines.slice(1);
     let imported = 0;
+    let updated = 0;
     let duplicates = 0;
     const errors: string[] = [];
 
@@ -1345,144 +1502,598 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             errors.push(`Row ${rowIdx}: Missing required fullName or email.`);
             return;
           }
-          const exists = alumni.some(a => a.email.toLowerCase() === rowObj.email.toLowerCase());
-          if (exists) {
-            duplicates++;
-            return;
+          const rowEmail = (rowObj.email || '').toLowerCase().trim();
+          const existingIndex = alumni.findIndex(a => (a.email || '').toLowerCase().trim() === rowEmail);
+
+          if (existingIndex >= 0) {
+            if (updateExisting) {
+              setAlumni(prev => {
+                const next = [...prev];
+                const target = next[existingIndex];
+                next[existingIndex] = {
+                  ...target,
+                  fullName: rowObj.fullName || target.fullName,
+                  batchYear: rowObj.batchYear ? Number(rowObj.batchYear) : target.batchYear,
+                  phone: rowObj.phone !== undefined && rowObj.phone !== '' ? rowObj.phone : target.phone,
+                  house: (rowObj.house as any) || target.house,
+                  city: rowObj.city || target.city,
+                  state: rowObj.state || target.state,
+                  country: rowObj.country || target.country,
+                  profession: rowObj.profession || target.profession,
+                  company: rowObj.company !== undefined && rowObj.company !== '' ? rowObj.company : target.company,
+                  designation: rowObj.designation !== undefined && rowObj.designation !== '' ? rowObj.designation : target.designation,
+                  industry: rowObj.industry || target.industry,
+                  bloodGroup: rowObj.bloodGroup || target.bloodGroup,
+                  bio: rowObj.bio || target.bio,
+                  isMentorAvailable: rowObj.isMentorAvailable !== undefined ? (rowObj.isMentorAvailable === 'true' || rowObj.isMentorAvailable === true) : target.isMentorAvailable,
+                  isBusinessOwner: rowObj.isBusinessOwner !== undefined ? (rowObj.isBusinessOwner === 'true' || rowObj.isBusinessOwner === true) : target.isBusinessOwner,
+                  isLookingForJobs: rowObj.isLookingForJobs !== undefined ? (rowObj.isLookingForJobs === 'true' || rowObj.isLookingForJobs === true) : target.isLookingForJobs,
+                  isHiring: rowObj.isHiring !== undefined ? (rowObj.isHiring === 'true' || rowObj.isHiring === true) : target.isHiring,
+                  verificationStatus: (rowObj.verificationStatus as any) || target.verificationStatus
+                };
+                return next;
+              });
+              updated++;
+            } else {
+              duplicates++;
+            }
+          } else {
+            const newAlum: AlumniProfile = {
+              id: `alum-imp-${Date.now()}-${idx}`,
+              fullName: rowObj.fullName,
+              email: rowObj.email.trim(),
+              batchYear: Number(rowObj.batchYear) || 2015,
+              phone: rowObj.phone || '',
+              house: (rowObj.house as any) || 'Aravali',
+              city: rowObj.city || 'Barmer',
+              state: rowObj.state || 'Rajasthan',
+              country: rowObj.country || 'India',
+              profession: rowObj.profession || 'Professional',
+              company: rowObj.company || '',
+              designation: rowObj.designation || '',
+              industry: rowObj.industry || 'Services',
+              bloodGroup: rowObj.bloodGroup || '',
+              bio: rowObj.bio || 'JNV Pachpadra Alumnus',
+              avatar: rowObj.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop',
+              isMentorAvailable: rowObj.isMentorAvailable === 'true' || rowObj.isMentorAvailable === true,
+              isBusinessOwner: rowObj.isBusinessOwner === 'true' || rowObj.isBusinessOwner === true,
+              isLookingForJobs: rowObj.isLookingForJobs === 'true' || rowObj.isLookingForJobs === true,
+              isHiring: rowObj.isHiring === 'true' || rowObj.isHiring === true,
+              verificationStatus: (rowObj.verificationStatus as any) || 'verified',
+              createdAt: new Date().toISOString()
+            };
+            setAlumni(prev => [newAlum, ...prev]);
+            imported++;
           }
-          const newAlum: AlumniProfile = {
-            id: `alum-imp-${Date.now()}-${idx}`,
-            fullName: rowObj.fullName,
-            email: rowObj.email,
-            batchYear: Number(rowObj.batchYear) || 2015,
-            phone: rowObj.phone || '',
-            house: (rowObj.house as any) || 'Aravali',
-            city: rowObj.city || 'Barmer',
-            state: rowObj.state || 'Rajasthan',
-            country: rowObj.country || 'India',
-            profession: rowObj.profession || 'Professional',
-            company: rowObj.company || '',
-            designation: rowObj.designation || '',
-            industry: rowObj.industry || 'Services',
-            bloodGroup: rowObj.bloodGroup || '',
-            bio: rowObj.bio || 'Imported alumnus profile',
-            avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop',
-            isMentorAvailable: true,
-            isBusinessOwner: false,
-            isLookingForJobs: false,
-            isHiring: false,
-            verificationStatus: 'verified',
-            createdAt: new Date().toISOString()
-          };
-          setAlumni(prev => [newAlum, ...prev]);
-          imported++;
-        } else if (moduleType === 'events') {
-          if (!rowObj.title || !rowObj.date) {
-            errors.push(`Row ${rowIdx}: Missing required event title or date.`);
-            return;
-          }
-          const newEvt: AlumniEvent = {
-            id: `evt-imp-${Date.now()}-${idx}`,
-            title: rowObj.title,
-            category: (rowObj.category as any) || 'Reunion',
-            date: rowObj.date,
-            time: rowObj.time || '10:00 AM',
-            location: rowObj.location || 'JNV Campus',
-            isOnline: rowObj.isOnline === 'true' || rowObj.isOnline === true,
-            isAlumniEvent: rowObj.isAlumniEvent !== 'false',
-            maxCapacity: Number(rowObj.maxCapacity) || 200,
-            description: rowObj.description || '',
-            registeredCount: 0,
-            image: 'https://images.unsplash.com/photo-1511578314322-379afb476865?w=600&h=350&fit=crop',
-            status: 'Upcoming'
-          };
-          setEvents(prev => [newEvt, ...prev]);
-          imported++;
-        } else if (moduleType === 'ledger') {
-          if (!rowObj.amount || !rowObj.description) {
-            errors.push(`Row ${rowIdx}: Missing required ledger amount or description.`);
-            return;
-          }
-          const newTx: FinancialTransaction = {
-            id: `tx-imp-${Date.now()}-${idx}`,
-            transactionId: rowObj.transactionId || `TXN-IMP-${Date.now()}-${idx}`,
-            type: rowObj.type === 'DEBIT' ? 'DEBIT' : 'CREDIT',
-            category: (rowObj.category as any) || 'Donations',
-            amount: Number(rowObj.amount) || 0,
-            description: rowObj.description,
-            date: rowObj.date || new Date().toISOString().split('T')[0],
-            visibility: (rowObj.visibility as any) || 'public',
-            auditedBy: rowObj.auditedBy || 'Auditor',
-            payeeOrDonor: rowObj.payeeOrDonor || ''
-          };
-          setLedgerTransactions(prev => [newTx, ...prev]);
-          imported++;
-        } else if (moduleType === 'financial_reports') {
-          if (!rowObj.title || !rowObj.financialYear) {
-            errors.push(`Row ${rowIdx}: Missing report title or financial year.`);
-            return;
-          }
-          const newRep: FinancialReport = {
-            id: `rep-imp-${Date.now()}-${idx}`,
-            title: rowObj.title,
-            financialYear: rowObj.financialYear,
-            category: (rowObj.category as any) || 'Annual Audit Report',
-            reportSummary: rowObj.reportSummary || '',
-            visibility: (rowObj.visibility as any) || 'public',
-            publishedDate: new Date().toISOString().split('T')[0],
-            auditorName: rowObj.auditorName || 'Chartered Accountant',
-            amountAudited: Number(rowObj.amountAudited) || 0,
-            status: 'Published'
-          };
-          setFinancialReports(prev => [newRep, ...prev]);
-          imported++;
-        } else if (moduleType === 'notices') {
-          if (!rowObj.title || !rowObj.content) {
-            errors.push(`Row ${rowIdx}: Missing notice title or content.`);
-            return;
-          }
-          const newNot: SchoolNotice = {
-            id: `not-imp-${Date.now()}-${idx}`,
-            title: rowObj.title,
-            category: (rowObj.category as any) || 'General',
-            publishDate: rowObj.publishDate || new Date().toISOString().split('T')[0],
-            targetAudience: (rowObj.targetAudience as any) || 'All',
-            content: rowObj.content,
-            isPinned: rowObj.isPinned === 'true',
-            referenceNo: rowObj.referenceNo || '',
-            status: 'Published'
-          };
-          setNotices(prev => [newNot, ...prev]);
-          imported++;
         } else if (moduleType === 'faculty') {
           if (!rowObj.name || !rowObj.department) {
             errors.push(`Row ${rowIdx}: Missing faculty name or department.`);
             return;
           }
-          const newFac: FacultyMember = {
-            id: `fac-imp-${Date.now()}-${idx}`,
-            name: rowObj.name,
-            designation: rowObj.designation || 'Teacher',
-            department: (rowObj.department as any) || 'Physics',
-            qualification: rowObj.qualification || 'M.Sc., B.Ed.',
-            experienceYears: Number(rowObj.experienceYears) || 5,
-            photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&h=300&fit=crop',
-            email: rowObj.email || ''
-          };
-          setFaculty(prev => [...prev, newFac]);
-          imported++;
+          const facName = (rowObj.name || '').toLowerCase().trim();
+          const facEmail = (rowObj.email || '').toLowerCase().trim();
+          const existingIndex = faculty.findIndex(f => 
+            (facEmail && (f.email || '').toLowerCase().trim() === facEmail) ||
+            (f.name || '').toLowerCase().trim() === facName
+          );
+
+          if (existingIndex >= 0) {
+            if (updateExisting) {
+              setFaculty(prev => {
+                const next = [...prev];
+                next[existingIndex] = {
+                  ...next[existingIndex],
+                  designation: rowObj.designation || next[existingIndex].designation,
+                  department: (rowObj.department as any) || next[existingIndex].department,
+                  qualification: rowObj.qualification || next[existingIndex].qualification,
+                  experienceYears: rowObj.experienceYears ? Number(rowObj.experienceYears) : next[existingIndex].experienceYears,
+                  email: rowObj.email || next[existingIndex].email,
+                  phone: rowObj.phone || next[existingIndex].phone
+                };
+                return next;
+              });
+              updated++;
+            } else {
+              duplicates++;
+            }
+          } else {
+            const newFac: FacultyMember = {
+              id: `fac-imp-${Date.now()}-${idx}`,
+              name: rowObj.name,
+              designation: rowObj.designation || 'Teacher',
+              department: (rowObj.department as any) || 'Physics',
+              qualification: rowObj.qualification || 'M.Sc., B.Ed.',
+              experienceYears: Number(rowObj.experienceYears) || 5,
+              photoUrl: rowObj.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&h=300&fit=crop',
+              email: rowObj.email || '',
+              phone: rowObj.phone || ''
+            };
+            setFaculty(prev => [...prev, newFac]);
+            imported++;
+          }
+        } else if (moduleType === 'notices') {
+          if (!rowObj.title || !rowObj.content) {
+            errors.push(`Row ${rowIdx}: Missing notice title or content.`);
+            return;
+          }
+          const refNo = (rowObj.referenceNo || '').toLowerCase().trim();
+          const title = (rowObj.title || '').toLowerCase().trim();
+          const existingIndex = notices.findIndex(n => 
+            (refNo && (n.referenceNo || '').toLowerCase().trim() === refNo) ||
+            (n.title || '').toLowerCase().trim() === title
+          );
+
+          if (existingIndex >= 0) {
+            if (updateExisting) {
+              setNotices(prev => {
+                const next = [...prev];
+                next[existingIndex] = {
+                  ...next[existingIndex],
+                  category: (rowObj.category as any) || next[existingIndex].category,
+                  publishDate: rowObj.publishDate || next[existingIndex].publishDate,
+                  targetAudience: (rowObj.targetAudience as any) || next[existingIndex].targetAudience,
+                  content: rowObj.content || next[existingIndex].content,
+                  isPinned: rowObj.isPinned !== undefined ? (rowObj.isPinned === 'true' || rowObj.isPinned === true) : next[existingIndex].isPinned,
+                  referenceNo: rowObj.referenceNo || next[existingIndex].referenceNo
+                };
+                return next;
+              });
+              updated++;
+            } else {
+              duplicates++;
+            }
+          } else {
+            const newNot: SchoolNotice = {
+              id: `not-imp-${Date.now()}-${idx}`,
+              title: rowObj.title,
+              category: (rowObj.category as any) || 'General',
+              publishDate: rowObj.publishDate || new Date().toISOString().split('T')[0],
+              targetAudience: (rowObj.targetAudience as any) || 'All',
+              content: rowObj.content,
+              isPinned: rowObj.isPinned === 'true' || rowObj.isPinned === true,
+              referenceNo: rowObj.referenceNo || `JNV/NOT/${Date.now()}`,
+              status: 'Published'
+            };
+            setNotices(prev => [newNot, ...prev]);
+            imported++;
+          }
+        } else if (moduleType === 'events') {
+          if (!rowObj.title || !rowObj.date) {
+            errors.push(`Row ${rowIdx}: Missing required event title or date.`);
+            return;
+          }
+          const title = (rowObj.title || '').toLowerCase().trim();
+          const date = (rowObj.date || '').trim();
+          const existingIndex = events.findIndex(e => 
+            (e.title || '').toLowerCase().trim() === title && (e.date || '').trim() === date
+          );
+
+          if (existingIndex >= 0) {
+            if (updateExisting) {
+              setEvents(prev => {
+                const next = [...prev];
+                next[existingIndex] = {
+                  ...next[existingIndex],
+                  category: (rowObj.category as any) || next[existingIndex].category,
+                  time: rowObj.time || next[existingIndex].time,
+                  location: rowObj.location || next[existingIndex].location,
+                  isOnline: rowObj.isOnline !== undefined ? (rowObj.isOnline === 'true' || rowObj.isOnline === true) : next[existingIndex].isOnline,
+                  maxCapacity: rowObj.maxCapacity ? Number(rowObj.maxCapacity) : next[existingIndex].maxCapacity,
+                  description: rowObj.description || next[existingIndex].description
+                };
+                return next;
+              });
+              updated++;
+            } else {
+              duplicates++;
+            }
+          } else {
+            const newEvt: AlumniEvent = {
+              id: `evt-imp-${Date.now()}-${idx}`,
+              title: rowObj.title,
+              category: (rowObj.category as any) || 'Reunion',
+              date: rowObj.date,
+              time: rowObj.time || '10:00 AM',
+              location: rowObj.location || 'JNV Campus',
+              isOnline: rowObj.isOnline === 'true' || rowObj.isOnline === true,
+              isAlumniEvent: rowObj.isAlumniEvent !== 'false',
+              maxCapacity: Number(rowObj.maxCapacity) || 200,
+              description: rowObj.description || '',
+              registeredCount: 0,
+              image: rowObj.image || 'https://images.unsplash.com/photo-1511578314322-379afb476865?w=600&h=350&fit=crop',
+              status: 'Upcoming'
+            };
+            setEvents(prev => [newEvt, ...prev]);
+            imported++;
+          }
+        } else if (moduleType === 'ledger') {
+          if (!rowObj.amount || !rowObj.description) {
+            errors.push(`Row ${rowIdx}: Missing required ledger amount or description.`);
+            return;
+          }
+          const txnId = (rowObj.transactionId || '').toLowerCase().trim();
+          const existingIndex = ledgerTransactions.findIndex(t => 
+            txnId && (t.transactionId || '').toLowerCase().trim() === txnId
+          );
+
+          if (existingIndex >= 0) {
+            if (updateExisting) {
+              setLedgerTransactions(prev => {
+                const next = [...prev];
+                next[existingIndex] = {
+                  ...next[existingIndex],
+                  type: rowObj.type === 'DEBIT' ? 'DEBIT' : 'CREDIT',
+                  category: (rowObj.category as any) || next[existingIndex].category,
+                  amount: Number(rowObj.amount) || next[existingIndex].amount,
+                  description: rowObj.description || next[existingIndex].description,
+                  date: rowObj.date || next[existingIndex].date,
+                  visibility: (rowObj.visibility as any) || next[existingIndex].visibility,
+                  auditedBy: rowObj.auditedBy || next[existingIndex].auditedBy,
+                  payeeOrDonor: rowObj.payeeOrDonor || next[existingIndex].payeeOrDonor
+                };
+                return next;
+              });
+              updated++;
+            } else {
+              duplicates++;
+            }
+          } else {
+            const newTx: FinancialTransaction = {
+              id: `tx-imp-${Date.now()}-${idx}`,
+              transactionId: rowObj.transactionId || `TXN-IMP-${Date.now()}-${idx}`,
+              type: rowObj.type === 'DEBIT' ? 'DEBIT' : 'CREDIT',
+              category: (rowObj.category as any) || 'Donations',
+              amount: Number(rowObj.amount) || 0,
+              description: rowObj.description,
+              date: rowObj.date || new Date().toISOString().split('T')[0],
+              visibility: (rowObj.visibility as any) || 'public',
+              auditedBy: rowObj.auditedBy || 'CA Auditor',
+              payeeOrDonor: rowObj.payeeOrDonor || ''
+            };
+            setLedgerTransactions(prev => [newTx, ...prev]);
+            imported++;
+          }
+        } else if (moduleType === 'financial_reports') {
+          if (!rowObj.title || !rowObj.financialYear) {
+            errors.push(`Row ${rowIdx}: Missing report title or financial year.`);
+            return;
+          }
+          const title = (rowObj.title || '').toLowerCase().trim();
+          const fy = (rowObj.financialYear || '').toLowerCase().trim();
+          const existingIndex = financialReports.findIndex(r => 
+            (r.title || '').toLowerCase().trim() === title && (r.financialYear || '').toLowerCase().trim() === fy
+          );
+
+          if (existingIndex >= 0) {
+            if (updateExisting) {
+              setFinancialReports(prev => {
+                const next = [...prev];
+                next[existingIndex] = {
+                  ...next[existingIndex],
+                  category: (rowObj.category as any) || next[existingIndex].category,
+                  reportSummary: rowObj.reportSummary || next[existingIndex].reportSummary,
+                  visibility: (rowObj.visibility as any) || next[existingIndex].visibility,
+                  auditorName: rowObj.auditorName || next[existingIndex].auditorName,
+                  amountAudited: rowObj.amountAudited ? Number(rowObj.amountAudited) : next[existingIndex].amountAudited
+                };
+                return next;
+              });
+              updated++;
+            } else {
+              duplicates++;
+            }
+          } else {
+            const newRep: FinancialReport = {
+              id: `rep-imp-${Date.now()}-${idx}`,
+              title: rowObj.title,
+              financialYear: rowObj.financialYear,
+              category: (rowObj.category as any) || 'Annual Audit Report',
+              reportSummary: rowObj.reportSummary || '',
+              visibility: (rowObj.visibility as any) || 'public',
+              publishedDate: new Date().toISOString().split('T')[0],
+              auditorName: rowObj.auditorName || 'Chartered Accountant',
+              amountAudited: Number(rowObj.amountAudited) || 0,
+              status: 'Published'
+            };
+            setFinancialReports(prev => [newRep, ...prev]);
+            imported++;
+          }
+        } else if (moduleType === 'toppers') {
+          if (!rowObj.name || !rowObj.percentage) {
+            errors.push(`Row ${rowIdx}: Missing topper student name or percentage.`);
+            return;
+          }
+          const name = (rowObj.name || '').toLowerCase().trim();
+          const year = Number(rowObj.year) || 2025;
+          const existingIndex = toppers.findIndex(t => 
+            (t.name || '').toLowerCase().trim() === name && t.year === year
+          );
+
+          if (existingIndex >= 0) {
+            if (updateExisting) {
+              setToppers(prev => {
+                const next = [...prev];
+                next[existingIndex] = {
+                  ...next[existingIndex],
+                  exam: rowObj.exam || next[existingIndex].exam,
+                  stream: rowObj.stream || next[existingIndex].stream,
+                  percentage: Number(rowObj.percentage) || next[existingIndex].percentage,
+                  currentPursuit: rowObj.currentPursuit || next[existingIndex].currentPursuit,
+                  photoUrl: rowObj.photoUrl || next[existingIndex].photoUrl
+                };
+                return next;
+              });
+              updated++;
+            } else {
+              duplicates++;
+            }
+          } else {
+            const newTop: BoardTopper = {
+              id: `top-imp-${Date.now()}-${idx}`,
+              name: rowObj.name,
+              exam: rowObj.exam || 'CBSE Class XII',
+              stream: rowObj.stream || 'Science',
+              percentage: Number(rowObj.percentage) || 95.0,
+              year: Number(rowObj.year) || 2025,
+              photoUrl: rowObj.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop',
+              currentPursuit: rowObj.currentPursuit || 'Higher Studies'
+            };
+            setToppers(prev => [...prev, newTop]);
+            imported++;
+          }
+        } else if (moduleType === 'blood_donors') {
+          const donorName = rowObj.fullName || rowObj.name;
+          if (!donorName || !rowObj.bloodGroup || !rowObj.phone) {
+            errors.push(`Row ${rowIdx}: Missing required donor name, bloodGroup, or phone.`);
+            return;
+          }
+          const phone = (rowObj.phone || '').trim();
+          const email = (rowObj.email || '').toLowerCase().trim();
+          const existingIndex = bloodDonors.findIndex(d => 
+            (phone && d.phone === phone) || (email && (d.email || '').toLowerCase().trim() === email)
+          );
+
+          if (existingIndex >= 0) {
+            if (updateExisting) {
+              setBloodDonors(prev => {
+                const next = [...prev];
+                next[existingIndex] = {
+                  ...next[existingIndex],
+                  name: donorName || next[existingIndex].name,
+                  bloodGroup: (rowObj.bloodGroup as any) || next[existingIndex].bloodGroup,
+                  city: rowObj.city || next[existingIndex].city,
+                  state: rowObj.state || next[existingIndex].state,
+                  isAvailable: rowObj.isAvailable !== undefined ? (rowObj.isAvailable === 'true' || rowObj.isAvailable === true) : next[existingIndex].isAvailable,
+                  lastDonatedDate: rowObj.lastDonatedDate || next[existingIndex].lastDonatedDate
+                };
+                return next;
+              });
+              updated++;
+            } else {
+              duplicates++;
+            }
+          } else {
+            const newDonor: BloodDonor = {
+              id: `donor-imp-${Date.now()}-${idx}`,
+              name: donorName,
+              bloodGroup: (rowObj.bloodGroup as any) || 'O+',
+              city: rowObj.city || 'Balotra',
+              state: rowObj.state || 'Rajasthan',
+              phone: rowObj.phone,
+              email: rowObj.email || '',
+              batchYear: Number(rowObj.batchYear) || 2015,
+              lastDonatedDate: rowObj.lastDonatedDate || '',
+              isAvailable: rowObj.isAvailable !== 'false',
+              isVerified: true,
+              emergencyContactNote: rowObj.hospitalOrArea || '',
+              createdAt: new Date().toISOString()
+            };
+            setBloodDonors(prev => [...prev, newDonor]);
+            imported++;
+          }
+        } else if (moduleType === 'vmc_members') {
+          if (!rowObj.name || !rowObj.designation) {
+            errors.push(`Row ${rowIdx}: Missing VMC member name or designation.`);
+            return;
+          }
+          const name = (rowObj.name || '').toLowerCase().trim();
+          const existingIndex = vmcMembers.findIndex(m => 
+            (m.name || '').toLowerCase().trim() === name
+          );
+
+          if (existingIndex >= 0) {
+            if (updateExisting) {
+              setVmcMembers(prev => {
+                const next = [...prev];
+                next[existingIndex] = {
+                  ...next[existingIndex],
+                  designation: rowObj.designation || next[existingIndex].designation,
+                  organization: rowObj.organization || next[existingIndex].organization,
+                  phone: rowObj.phone || next[existingIndex].phone,
+                  email: rowObj.email || next[existingIndex].email
+                };
+                return next;
+              });
+              updated++;
+            } else {
+              duplicates++;
+            }
+          } else {
+            const newMember: VMCLeader = {
+              id: `vmc-imp-${Date.now()}-${idx}`,
+              name: rowObj.name,
+              designation: rowObj.designation,
+              organization: rowObj.organization || 'Institutional Council',
+              phone: rowObj.phone || '',
+              email: rowObj.email || ''
+            };
+            setVmcMembers(prev => [...prev, newMember]);
+            imported++;
+          }
+        } else if (moduleType === 'donation_campaigns') {
+          if (!rowObj.title || !rowObj.targetAmount) {
+            errors.push(`Row ${rowIdx}: Missing campaign title or target amount.`);
+            return;
+          }
+          const title = (rowObj.title || '').toLowerCase().trim();
+          const existingIndex = donationCampaigns.findIndex(c => 
+            (c.title || '').toLowerCase().trim() === title
+          );
+
+          if (existingIndex >= 0) {
+            if (updateExisting) {
+              setDonationCampaigns(prev => {
+                const next = [...prev];
+                next[existingIndex] = {
+                  ...next[existingIndex],
+                  category: (rowObj.category as any) || next[existingIndex].category,
+                  targetAmount: Number(rowObj.targetAmount) || next[existingIndex].targetAmount,
+                  currentAmount: rowObj.currentAmount ? Number(rowObj.currentAmount) : next[existingIndex].currentAmount,
+                  donorsCount: rowObj.donorsCount || rowObj.donorCount ? Number(rowObj.donorsCount || rowObj.donorCount) : next[existingIndex].donorsCount,
+                  isActive: rowObj.isActive !== undefined ? (rowObj.isActive === 'true' || rowObj.isActive === true) : next[existingIndex].isActive,
+                  endDate: rowObj.endDate || next[existingIndex].endDate,
+                  description: rowObj.description || next[existingIndex].description
+                };
+                return next;
+              });
+              updated++;
+            } else {
+              duplicates++;
+            }
+          } else {
+            const newCamp: DonationCampaign = {
+              id: `camp-imp-${Date.now()}-${idx}`,
+              title: rowObj.title,
+              category: (rowObj.category as any) || 'Infrastructure',
+              targetAmount: Number(rowObj.targetAmount) || 100000,
+              currentAmount: Number(rowObj.currentAmount) || 0,
+              donorsCount: Number(rowObj.donorsCount || rowObj.donorCount) || 0,
+              isActive: rowObj.isActive !== 'false',
+              endDate: rowObj.endDate || '2026-12-31',
+              description: rowObj.description || '',
+              coverImage: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?w=600&h=350&fit=crop',
+              createdAt: new Date().toISOString()
+            };
+            setDonationCampaigns(prev => [...prev, newCamp]);
+            imported++;
+          }
+        } else if (moduleType === 'jobs') {
+          if (!rowObj.title || !rowObj.company) {
+            errors.push(`Row ${rowIdx}: Missing job title or company.`);
+            return;
+          }
+          const title = (rowObj.title || '').toLowerCase().trim();
+          const company = (rowObj.company || '').toLowerCase().trim();
+          const existingIndex = jobs.findIndex(j => 
+            (j.title || '').toLowerCase().trim() === title && (j.company || '').toLowerCase().trim() === company
+          );
+
+          if (existingIndex >= 0) {
+            if (updateExisting) {
+              setJobs(prev => {
+                const next = [...prev];
+                next[existingIndex] = {
+                  ...next[existingIndex],
+                  location: rowObj.location || next[existingIndex].location,
+                  employmentType: (rowObj.employmentType as any) || next[existingIndex].employmentType,
+                  experience: rowObj.experience || next[existingIndex].experience,
+                  salaryRange: rowObj.salaryRange || next[existingIndex].salaryRange,
+                  description: rowObj.description || next[existingIndex].description,
+                  applyLinkOrEmail: rowObj.applyLinkOrEmail || next[existingIndex].applyLinkOrEmail
+                };
+                return next;
+              });
+              updated++;
+            } else {
+              duplicates++;
+            }
+          } else {
+            const newJob: JobPosting = {
+              id: `job-imp-${Date.now()}-${idx}`,
+              title: rowObj.title,
+              company: rowObj.company,
+              location: rowObj.location || 'Remote',
+              employmentType: (rowObj.employmentType as any) || 'Full-Time',
+              experience: rowObj.experience || '2+ Years',
+              salaryRange: rowObj.salaryRange || '',
+              description: rowObj.description || '',
+              applyLinkOrEmail: rowObj.applyLinkOrEmail || 'careers@alumni.jnv.in',
+              postedByName: rowObj.postedByName || 'Alumni Admin',
+              postedByBatch: Number(rowObj.postedByBatch) || 2012,
+              postedByEmail: rowObj.postedByEmail || 'admin@alumni.jnv.in',
+              isActive: true,
+              createdAt: new Date().toISOString()
+            };
+            setJobs(prev => [newJob, ...prev]);
+            imported++;
+          }
+        } else if (moduleType === 'businesses') {
+          if (!rowObj.name || !rowObj.ownerName) {
+            errors.push(`Row ${rowIdx}: Missing business name or owner name.`);
+            return;
+          }
+          const name = (rowObj.name || '').toLowerCase().trim();
+          const existingIndex = businesses.findIndex(b => 
+            (b.name || '').toLowerCase().trim() === name
+          );
+
+          if (existingIndex >= 0) {
+            if (updateExisting) {
+              setBusinesses(prev => {
+                const next = [...prev];
+                next[existingIndex] = {
+                  ...next[existingIndex],
+                  category: rowObj.category || next[existingIndex].category,
+                  ownerName: rowObj.ownerName || next[existingIndex].ownerName,
+                  ownerBatch: rowObj.ownerBatch ? Number(rowObj.ownerBatch) : next[existingIndex].ownerBatch,
+                  ownerEmail: rowObj.ownerEmail || next[existingIndex].ownerEmail,
+                  ownerPhone: rowObj.ownerPhone || next[existingIndex].ownerPhone,
+                  website: rowObj.website || next[existingIndex].website,
+                  description: rowObj.description || next[existingIndex].description,
+                  city: rowObj.city || next[existingIndex].city,
+                  discountForAlumni: rowObj.discountForAlumni || next[existingIndex].discountForAlumni,
+                  isVerified: rowObj.isVerified !== undefined ? (rowObj.isVerified === 'true' || rowObj.isVerified === true) : next[existingIndex].isVerified
+                };
+                return next;
+              });
+              updated++;
+            } else {
+              duplicates++;
+            }
+          } else {
+            const newBiz: BusinessListing = {
+              id: `biz-imp-${Date.now()}-${idx}`,
+              name: rowObj.name,
+              category: rowObj.category || 'Services',
+              ownerName: rowObj.ownerName,
+              ownerBatch: Number(rowObj.ownerBatch) || 2012,
+              ownerEmail: rowObj.ownerEmail || '',
+              ownerPhone: rowObj.ownerPhone || '',
+              website: rowObj.website || '',
+              description: rowObj.description || '',
+              isVerified: rowObj.isVerified !== 'false',
+              city: rowObj.city || 'Balotra',
+              discountForAlumni: rowObj.discountForAlumni || 'Special alumni discount',
+              createdAt: new Date().toISOString()
+            };
+            setBusinesses(prev => [newBiz, ...prev]);
+            imported++;
+          }
         }
       } catch (err: any) {
         errors.push(`Row ${rowIdx}: Parse error - ${err.message}`);
       }
     });
 
+    const totalProcessed = imported + updated;
     return {
-      success: imported > 0,
+      success: totalProcessed > 0,
       importedCount: imported,
+      updatedCount: updated,
       duplicateCount: duplicates,
+      totalProcessed,
       errors,
-      message: `Imported ${imported} records successfully. ${duplicates} duplicates skipped. ${errors.length} errors.`
+      message: `Processed ${dataLines.length} rows: ${imported} added new, ${updated} updated with latest details. ${duplicates} duplicates skipped. ${errors.length} errors.`
     };
   };
 
@@ -1572,6 +2183,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteDonationCampaign,
         donationRecords,
         recordDonation,
+
+        bloodDonors,
+        addBloodDonor,
+        updateBloodDonor,
+        deleteBloodDonor,
+        toggleBloodDonorAvailability,
+        bloodRequests,
+        submitBloodRequest,
+        updateBloodRequestStatus,
+        deleteBloodRequest,
 
         memories,
         addMemory,

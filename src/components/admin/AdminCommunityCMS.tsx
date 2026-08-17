@@ -14,9 +14,12 @@ import {
   ExternalLink,
   Target,
   Users,
-  DollarSign
+  DollarSign,
+  Download,
+  Upload
 } from 'lucide-react';
 import { JobPosting, BusinessListing, WelfareCase, DonationCampaign, Achievement } from '../../types';
+import { CSVBulkImportModal } from './CSVBulkImportModal';
 
 export const AdminCommunityCMS: React.FC = () => {
   const {
@@ -49,10 +52,24 @@ export const AdminCommunityCMS: React.FC = () => {
     donationCampaigns,
     addDonationCampaign,
     updateDonationCampaign,
-    deleteDonationCampaign
+    deleteDonationCampaign,
+    getCSVTemplate
   } = useData();
 
   const [activeTab, setActiveTab] = useState<'jobs' | 'businesses' | 'campaigns' | 'welfare' | 'achievements'>('campaigns');
+  const [csvModalModule, setCsvModalModule] = useState<string | null>(null);
+
+  const handleDownloadSample = (moduleId: string) => {
+    const template = getCSVTemplate(moduleId);
+    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `sample_${moduleId}_data.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // New Campaign Form Modal
   const [isNewCampOpen, setIsNewCampOpen] = useState(false);
@@ -165,18 +182,38 @@ export const AdminCommunityCMS: React.FC = () => {
       {/* 1. Donation Campaigns */}
       {activeTab === 'campaigns' && (
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
             <div>
               <h3 className="text-lg font-bold text-white">Active & Past Donation Fundraisers</h3>
               <p className="text-xs text-slate-400">Launch and manage campus development campaigns</p>
             </div>
-            <button
-              onClick={() => setIsNewCampOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold"
-            >
-              <Plus className="w-4 h-4" />
-              Launch New Campaign
-            </button>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                id="download-campaigns-sample-csv-btn"
+                onClick={() => handleDownloadSample('donation_campaigns')}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs font-bold transition shadow"
+                title="Download sample donation campaigns CSV template"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Sample Data</span>
+              </button>
+              <button
+                id="upload-campaigns-csv-btn"
+                onClick={() => setCsvModalModule('donation_campaigns')}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition shadow"
+                title="Bulk upload or update donation causes via CSV"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload through CSV</span>
+              </button>
+              <button
+                onClick={() => setIsNewCampOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold"
+              >
+                <Plus className="w-4 h-4" />
+                Launch Campaign
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -351,12 +388,36 @@ export const AdminCommunityCMS: React.FC = () => {
       {/* 4. Jobs & 5. Businesses */}
       {(activeTab === 'jobs' || activeTab === 'businesses') && (
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
-          <h3 className="text-lg font-bold text-white mb-4">
-            {activeTab === 'jobs' ? 'Alumni Job Postings' : 'Verified Business Directory'}
-          </h3>
-          <p className="text-xs text-slate-400 mb-4">
-            Use the "Approvals Queue" tab for quick verification, or modify listings below.
-          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-white">
+                {activeTab === 'jobs' ? 'Alumni Job Postings' : 'Verified Business Directory'}
+              </h3>
+              <p className="text-xs text-slate-400">
+                Use the "Approvals Queue" tab for quick verification, or manage details below.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                id={`download-${activeTab}-sample-csv-btn`}
+                onClick={() => handleDownloadSample(activeTab)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs font-bold transition shadow"
+                title={`Download sample ${activeTab} CSV template`}
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Sample Data</span>
+              </button>
+              <button
+                id={`upload-${activeTab}-csv-btn`}
+                onClick={() => setCsvModalModule(activeTab)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition shadow"
+                title={`Bulk upload or update ${activeTab} via CSV`}
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload through CSV</span>
+              </button>
+            </div>
+          </div>
           <div className="space-y-3">
             {activeTab === 'jobs' &&
               jobs.map(job => (
@@ -587,6 +648,12 @@ export const AdminCommunityCMS: React.FC = () => {
           </div>
         </div>
       )}
+      {/* CSV Bulk Import Universal Modal */}
+      <CSVBulkImportModal
+        isOpen={!!csvModalModule}
+        onClose={() => setCsvModalModule(null)}
+        initialModule={csvModalModule || 'donation_campaigns'}
+      />
     </div>
   );
 };

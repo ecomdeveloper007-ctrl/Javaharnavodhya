@@ -49,8 +49,9 @@ export const FinancialTransparencyView: React.FC = () => {
     if (t.visibility === 'admin_only' && (!user || !user.isAdmin)) return false;
 
     const matchesSearch =
-      t.description.toLowerCase().includes(txSearch.toLowerCase()) ||
-      t.transactionId.toLowerCase().includes(txSearch.toLowerCase()) ||
+      !txSearch ||
+      (t.description && t.description.toLowerCase().includes(txSearch.toLowerCase())) ||
+      (t.transactionId && t.transactionId.toLowerCase().includes(txSearch.toLowerCase())) ||
       (t.payeeOrDonor && t.payeeOrDonor.toLowerCase().includes(txSearch.toLowerCase()));
 
     const matchesType = txTypeFilter === 'All' || t.type === txTypeFilter;

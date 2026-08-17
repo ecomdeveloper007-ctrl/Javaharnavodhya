@@ -29,7 +29,10 @@ import {
   Building2,
   History,
   Bot,
-  Languages
+  Languages,
+  Heart,
+  Droplet,
+  Receipt
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -500,6 +503,32 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAIChat }) => {
             </button>
 
             <button
+              onClick={() => handleNavClick('donations')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center space-x-1 ${
+                activeTab === 'donations'
+                  ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
+                  : 'text-amber-700 bg-amber-50 hover:bg-amber-100 hover:text-amber-900 border border-amber-200'
+              }`}
+              title="80G Tax Exempted Giving Portal"
+            >
+              <Receipt className="w-3.5 h-3.5 text-amber-600" />
+              <span>{isHindi ? 'दान एवं 80G' : 'Donations (80G)'}</span>
+            </button>
+
+            <button
+              onClick={() => handleNavClick('blood-donation')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center space-x-1 ${
+                activeTab === 'blood-donation'
+                  ? 'bg-rose-600 text-white font-black shadow-xs'
+                  : 'text-rose-700 bg-rose-50 hover:bg-rose-100 hover:text-rose-900 border border-rose-200'
+              }`}
+              title="Navodaya Blood Donors & Emergency SOS Network"
+            >
+              <Droplet className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
+              <span>{isHindi ? 'रक्तदान संजाल' : 'Blood Lifeline'}</span>
+            </button>
+
+            <button
               onClick={() => handleNavClick('contact')}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
                 activeTab === 'contact'
@@ -669,6 +698,34 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAIChat }) => {
                           <div className="text-[10px] text-slate-400 font-normal">{isHindi ? 'छात्रवृत्ति एवं साथी सहयोग' : 'Student scholarships and support'}</div>
                         </div>
                       </button>
+                      <button
+                        onClick={() => handleNavClick('donations')}
+                        className={`w-full text-left px-3.5 py-2 text-xs flex items-center space-x-2.5 cursor-pointer ${
+                          activeTab === 'donations'
+                            ? 'bg-amber-50 text-amber-950 font-bold'
+                            : 'text-slate-700 hover:bg-amber-50/60 hover:text-amber-950'
+                        }`}
+                      >
+                        <Receipt className="w-4 h-4 text-amber-600" />
+                        <div>
+                          <div className="font-semibold leading-tight text-amber-900">{isHindi ? '80G दान एवं रसीद पोर्टल' : '80G Donation & Giving Portal'}</div>
+                          <div className="text-[10px] text-slate-400 font-normal">{isHindi ? '50% आयकर छूट एवं तत्काल डिजिटल रसीद' : '50% Tax Exemption & Instant 80G Receipts'}</div>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => handleNavClick('blood-donation')}
+                        className={`w-full text-left px-3.5 py-2 text-xs flex items-center space-x-2.5 cursor-pointer ${
+                          activeTab === 'blood-donation'
+                            ? 'bg-rose-50 text-rose-950 font-bold'
+                            : 'text-slate-700 hover:bg-rose-50/60 hover:text-rose-950'
+                        }`}
+                      >
+                        <Droplet className="w-4 h-4 text-rose-600 fill-rose-500" />
+                        <div>
+                          <div className="font-semibold leading-tight text-rose-900">{isHindi ? 'नवोदय रक्तदाता जीवनदान संजाल' : 'Blood Lifeline & SOS Portal'}</div>
+                          <div className="text-[10px] text-slate-400 font-normal">{isHindi ? 'रक्तदाता सूची एवं आपातकालीन सहायता' : 'Donors Directory & Emergency Blood SOS'}</div>
+                        </div>
+                      </button>
                     </div>
                     {(user?.isAdmin || hasPermission('access_admin_portal') || user?.email?.toLowerCase().trim() === 'prakashinfosys1234@gmail.com') && (
                       <div className="pt-1 border-t border-slate-100 mt-1">
@@ -834,6 +891,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAIChat }) => {
               {t.financialTransparency}
             </button>
             <button
+              onClick={() => handleNavClick('donations')}
+              className="text-left px-3 py-2 rounded-lg text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 flex items-center space-x-1.5"
+            >
+              <Receipt className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span>{isHindi ? 'दान एवं 80G रसीद' : 'Donations (80G)'}</span>
+            </button>
+            <button
+              onClick={() => handleNavClick('blood-donation')}
+              className="text-left px-3 py-2 rounded-lg text-xs font-bold text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 flex items-center space-x-1.5"
+            >
+              <Droplet className="w-3.5 h-3.5 text-rose-500 fill-rose-500 shrink-0" />
+              <span>{isHindi ? 'रक्तदान संजाल (SOS)' : 'Blood Lifeline'}</span>
+            </button>
+            <button
               onClick={() => handleNavClick('contact')}
               className="text-left px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-950"
             >
@@ -948,6 +1019,28 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAIChat }) => {
                 >
                   <Compass className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   <span className="truncate">{t.welfareAid}</span>
+                </button>
+                <button
+                  onClick={() => handleNavClick('donations')}
+                  className={`text-left px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-1.5 cursor-pointer ${
+                    activeTab === 'donations'
+                      ? 'bg-amber-600 text-white font-bold'
+                      : 'bg-white/80 text-amber-900 hover:bg-white'
+                  }`}
+                >
+                  <Receipt className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span className="truncate">80G Donations</span>
+                </button>
+                <button
+                  onClick={() => handleNavClick('blood-donation')}
+                  className={`text-left px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-1.5 cursor-pointer ${
+                    activeTab === 'blood-donation'
+                      ? 'bg-rose-600 text-white font-bold'
+                      : 'bg-white/80 text-rose-900 hover:bg-white'
+                  }`}
+                >
+                  <Droplet className="w-3.5 h-3.5 text-rose-500 fill-rose-500 shrink-0" />
+                  <span className="truncate">Blood SOS</span>
                 </button>
               </div>
             )}

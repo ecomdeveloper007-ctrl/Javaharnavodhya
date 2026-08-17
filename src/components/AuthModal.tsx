@@ -31,6 +31,7 @@ export const AuthModal: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState(false);
+  const [customEmail, setCustomEmail] = useState('');
 
   if (!isAuthModalOpen) return null;
 
@@ -46,6 +47,18 @@ export const AuthModal: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleCustomEmailLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customEmail.trim()) return;
+    const cleanEmail = customEmail.trim().toLowerCase();
+    if (cleanEmail === 'prakashinfosys1234@gmail.com') {
+      loginDirectlyAsSuperAdmin();
+    } else {
+      loginDirectlyAs(cleanEmail);
+    }
+    setIsAuthModalOpen(false);
   };
 
   const handleCopyDomain = () => {
@@ -180,6 +193,33 @@ export const AuthModal: React.FC = () => {
                     : (isHindi ? 'गूगल खाते से जारी रखें' : 'Continue with Google')}
                 </span>
               </button>
+
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-slate-200"></div>
+                <span className="flex-shrink mx-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                  {isHindi ? 'अथवा ईमेल से साइन इन करें' : 'Or with Registered Email'}
+                </span>
+                <div className="flex-grow border-t border-slate-200"></div>
+              </div>
+
+              <form onSubmit={handleCustomEmailLogin} className="space-y-2">
+                <div className="flex space-x-2">
+                  <input
+                    type="email"
+                    required
+                    value={customEmail}
+                    onChange={(e) => setCustomEmail(e.target.value)}
+                    placeholder="Enter email (e.g. prakashinfosys1234@gmail.com)"
+                    className="flex-1 px-3 py-2 text-xs bg-white rounded-xl border border-slate-300 focus:outline-none focus:border-slate-500 text-slate-900"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition cursor-pointer shrink-0"
+                  >
+                    {isHindi ? 'साइन इन' : 'Sign In'}
+                  </button>
+                </div>
+              </form>
             </div>
 
             {/* Instant 1-Click Super Admin Access */}

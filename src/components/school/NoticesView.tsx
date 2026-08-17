@@ -27,8 +27,9 @@ export const NoticesView: React.FC = () => {
     const matchesCategory = categoryFilter === 'All' || n.category === categoryFilter;
     const matchesAudience = audienceFilter === 'All' || n.targetAudience === audienceFilter || n.targetAudience === 'All';
     const matchesSearch =
-      n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      n.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      !searchQuery ||
+      (n.title && n.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (n.content && n.content.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (n.referenceNo && n.referenceNo.toLowerCase().includes(searchQuery.toLowerCase()));
 
     return matchesCategory && matchesAudience && matchesSearch;

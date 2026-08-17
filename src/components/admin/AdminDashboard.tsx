@@ -44,6 +44,7 @@ import { AdminUserRoleManager } from './AdminUserRoleManager';
 import { AdminWebsiteCMS } from './AdminWebsiteCMS';
 import { AdminCommunityCMS } from './AdminCommunityCMS';
 import { AdminCSVTools } from './AdminCSVTools';
+import { CSVBulkImportModal } from './CSVBulkImportModal';
 import { SEED_ROLES_PERMISSIONS } from '../../data/seedData';
 import { UserRole } from '../../types';
 
@@ -91,6 +92,7 @@ export const AdminDashboard: React.FC<{ onClose?: () => void }> = ({ onClose }) 
     vmcMembers,
     schoolSettings,
     exportToCSV,
+    getCSVTemplate,
     resetToDefaultSeedData,
     setActiveTab: setGlobalActiveTab,
     setActiveAlumniSubTab,
@@ -100,8 +102,21 @@ export const AdminDashboard: React.FC<{ onClose?: () => void }> = ({ onClose }) 
   const isAuthorized = user && (user.isAdmin || hasPermission('access_admin_portal') || user.email?.toLowerCase().trim() === 'prakashinfosys1234@gmail.com');
 
   const [activeTab, setActiveTab] = useState<string>('overview');
+  const [csvModalModule, setCsvModalModule] = useState<string | null>(null);
   const [isAdminAlumniDropdownOpen, setIsAdminAlumniDropdownOpen] = useState(false);
   const adminAlumniDropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleDownloadSample = (moduleId: string) => {
+    const template = getCSVTemplate(moduleId);
+    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `sample_${moduleId}_data.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -733,15 +748,35 @@ export const AdminDashboard: React.FC<{ onClose?: () => void }> = ({ onClose }) 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
               <div>
                 <h2 className="text-xl font-bold text-white">Official Notices & Circulars CMS</h2>
-                <p className="text-xs text-slate-400 mt-1">Publish and manage institutional announcements</p>
+                <p className="text-xs text-slate-400 mt-1">Publish, update and manage institutional announcements</p>
               </div>
-              <button
-                onClick={() => setIsNewNoticeOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-md shadow-amber-500/20"
-              >
-                <Plus className="w-4 h-4" />
-                Publish New Notice
-              </button>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  id="download-notices-sample-csv-btn"
+                  onClick={() => handleDownloadSample('notices')}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs font-bold transition shadow"
+                  title="Download sample notices CSV template"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Sample Data</span>
+                </button>
+                <button
+                  id="upload-notices-csv-btn"
+                  onClick={() => setCsvModalModule('notices')}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition shadow"
+                  title="Bulk upload or update notices via CSV"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload through CSV</span>
+                </button>
+                <button
+                  onClick={() => setIsNewNoticeOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-600/20"
+                >
+                  <Plus className="w-4 h-4" />
+                  Publish Notice
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -866,13 +901,33 @@ export const AdminDashboard: React.FC<{ onClose?: () => void }> = ({ onClose }) 
                 <h2 className="text-xl font-bold text-white">Faculty & Staff Directory CMS</h2>
                 <p className="text-xs text-slate-400 mt-1">Manage teachers, qualifications, and department rosters</p>
               </div>
-              <button
-                onClick={() => setIsNewFacultyOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20"
-              >
-                <Plus className="w-4 h-4" />
-                Add Faculty Member
-              </button>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  id="download-faculty-sample-csv-btn"
+                  onClick={() => handleDownloadSample('faculty')}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs font-bold transition shadow"
+                  title="Download sample faculty CSV template"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Sample Data</span>
+                </button>
+                <button
+                  id="upload-faculty-csv-btn"
+                  onClick={() => setCsvModalModule('faculty')}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition shadow"
+                  title="Bulk upload or update faculty records via CSV"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload through CSV</span>
+                </button>
+                <button
+                  onClick={() => setIsNewFacultyOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Faculty
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1137,7 +1192,25 @@ export const AdminDashboard: React.FC<{ onClose?: () => void }> = ({ onClose }) 
                 <h2 className="text-xl font-bold text-white">Financial Transparency & Double-Entry Ledger</h2>
                 <p className="text-xs text-slate-400 mt-1">Audit reports, donor utilization, and chartered ledger</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  id="download-ledger-sample-csv-btn"
+                  onClick={() => handleDownloadSample('ledger')}
+                  className="px-3 py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow"
+                  title="Download sample financial ledger CSV template"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Sample Data</span>
+                </button>
+                <button
+                  id="upload-ledger-csv-btn"
+                  onClick={() => setCsvModalModule('ledger')}
+                  className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition flex items-center gap-1.5 shadow"
+                  title="Bulk upload or update ledger entries via CSV"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload through CSV</span>
+                </button>
                 <button
                   onClick={() => setIsNewTxOpen(true)}
                   className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold"
@@ -1279,6 +1352,13 @@ export const AdminDashboard: React.FC<{ onClose?: () => void }> = ({ onClose }) 
           </div>
         )}
       </main>
+
+      {/* CSV Bulk Import & Update Universal Modal */}
+      <CSVBulkImportModal
+        isOpen={!!csvModalModule}
+        onClose={() => setCsvModalModule(null)}
+        initialModule={csvModalModule || 'alumni'}
+      />
     </div>
   );
 };

@@ -145,7 +145,7 @@ export interface DataContextType {
   addAlumnusDirectly: (profile: Omit<AlumniProfile, 'id' | 'createdAt'>) => void;
   updateAlumniProfile: (id: string, updates: Partial<AlumniProfile>) => void;
   deleteAlumni: (id: string) => void;
-  registerAlumni: (profile: Omit<AlumniProfile, 'id' | 'createdAt' | 'verificationStatus'>) => void;
+  registerAlumni: (profile: Omit<AlumniProfile, 'id' | 'createdAt' | 'verificationStatus'>) => { success: boolean; message: string; id: string };
 
   // Business Directory
   businesses: BusinessListing[];
@@ -894,15 +894,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     deleteDocFromFirestore('alumniProfiles', id);
   };
 
-  const registerAlumni = (profileData: Omit<AlumniProfile, 'id' | 'createdAt' | 'verificationStatus'>) => {
-    const newProfile: AlumniProfile = {
-      ...profileData,
-      id: `alum-${Date.now()}`,
-      verificationStatus: 'pending',
-      createdAt: new Date().toISOString()
-    };
-    setAlumni(prev => [newProfile, ...prev]);
-    saveDocToFirestore('alumniProfiles', newProfile.id, newProfile);
+  const registerAlumni = (profileData: Omit<AlumniProfile, 'id' | 'createdAt' | 'verificationStatus'>): { success: boolean; message: string; id: string } => {
+    try {
+      const newProfile: AlumniProfile = {
+        ...profileData,
+        id: `alum-${Date.now()}`,
+        verificationStatus: 'pending',
+        createdAt: new Date().toISOString()
+      };
+      setAlumni(prev => [newProfile, ...prev]);
+      saveDocToFirestore('alumniProfiles', newProfile.id, newProfile);
+      return {
+        success: true,
+        message: 'Alumni registration submitted successfully! Your profile has been sent for verification and recorded in the database.',
+        id: newProfile.id
+      };
+    } catch (err: any) {
+      console.error('Error during alumni registration:', err);
+      return {
+        success: false,
+        message: err?.message || 'Failed to submit alumni registration. Please try again.',
+        id: ''
+      };
+    }
   };
 
   const updateBatchInfo = (passoutYear: number, updates: Partial<BatchInfo>) => {

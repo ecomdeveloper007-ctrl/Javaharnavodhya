@@ -492,17 +492,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAIChat }) => {
             </button>
 
             <button
-              onClick={() => handleNavClick('financials')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                activeTab === 'financials'
-                  ? 'bg-slate-900 text-white font-semibold shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              {t.financialTransparency}
-            </button>
-
-            <button
               onClick={() => handleNavClick('contact')}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
                 activeTab === 'contact'
@@ -857,12 +846,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAIChat }) => {
               className="text-left px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-950"
             >
               {t.photoGallery}
-            </button>
-            <button
-              onClick={() => handleNavClick('financials')}
-              className="text-left px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-950"
-            >
-              {t.financialTransparency}
             </button>
             <button
               onClick={() => handleNavClick('contact')}

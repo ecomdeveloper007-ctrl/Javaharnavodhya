@@ -132,7 +132,7 @@
     },
     "donations": {
       "title": "Donations",
-      "description": "Donation records and receipts",
+      "description": "Donation records and receipts with 80G tax exemption",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -144,10 +144,141 @@
         "amount": { "type": "number" },
         "paymentMode": { "type": "string" },
         "transactionRef": { "type": "string" },
+        "receiptNumber": { "type": "string" },
+        "taxExempt80GRegNo": { "type": "string" },
         "paymentStatus": { "type": "string" },
         "isAnonymous": { "type": "boolean" },
         "note": { "type": "string" },
+        "receiptImageUrl": { "type": "string" },
+        "rejectionReason": { "type": "string" },
+        "verifiedBy": { "type": "string" },
+        "verifiedAt": { "type": "string" },
         "createdAt": { "type": "string" }
+      }
+    },
+    "paymentSettings": {
+      "title": "Payment Settings",
+      "description": "Bank account, UPI QR, and 80G tax registration configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "accountHolderName": { "type": "string" },
+        "bankName": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "ifscCode": { "type": "string" },
+        "swiftCode": { "type": "string" },
+        "branchName": { "type": "string" },
+        "upiId": { "type": "string" },
+        "upiQrImageUrl": { "type": "string" },
+        "paymentInstructions": { "type": "string" },
+        "donationContactEmail": { "type": "string" },
+        "donationContactPhone": { "type": "string" },
+        "currency": { "type": "string" },
+        "minDonationAmount": { "type": "number" },
+        "enableUpi": { "type": "boolean" },
+        "enableBankTransfer": { "type": "boolean" },
+        "enablePaymentGateway": { "type": "boolean" },
+        "enableManualOther": { "type": "boolean" },
+        "reg80GNumber": { "type": "string" },
+        "taxBenefitPercentage": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "schoolSettings": {
+      "title": "School Settings",
+      "description": "Institutional information, principal profile, and campus metrics",
+      "type": "object",
+      "properties": {
+        "schoolName": { "type": "string" },
+        "cbseAffiliationNo": { "type": "string" },
+        "schoolCode": { "type": "string" },
+        "foundedYear": { "type": "number" },
+        "tagline": { "type": "string" },
+        "tickerAnnouncement": { "type": "string" },
+        "principalName": { "type": "string" }
+      }
+    },
+    "notices": {
+      "title": "School Notices",
+      "description": "Official notices, circulars, and academic announcements",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "date": { "type": "string" },
+        "content": { "type": "string" },
+        "isPinned": { "type": "boolean" }
+      }
+    },
+    "faculty": {
+      "title": "Faculty & Staff",
+      "description": "School teaching and administrative staff directory",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "designation": { "type": "string" },
+        "department": { "type": "string" },
+        "qualification": { "type": "string" },
+        "experienceYears": { "type": "number" },
+        "photoUrl": { "type": "string" }
+      }
+    },
+    "gallery": {
+      "title": "Photo Gallery",
+      "description": "Campus life, events, and sports gallery",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "caption": { "type": "string" },
+        "date": { "type": "string" }
+      }
+    },
+    "admissionEnquiries": {
+      "title": "Admission Enquiries",
+      "description": "Prospective student admission enquiry forms",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentName": { "type": "string" },
+        "parentName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "classSeeking": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "bloodDonors": {
+      "title": "Blood Donors",
+      "description": "Navodaya verified blood donors directory",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "bloodGroup": { "type": "string" },
+        "batchYear": { "type": "number" },
+        "city": { "type": "string" },
+        "phone": { "type": "string" },
+        "isAvailable": { "type": "boolean" }
+      }
+    },
+    "bloodRequests": {
+      "title": "Blood Requests",
+      "description": "Emergency blood requests and SOS notifications",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "patientName": { "type": "string" },
+        "bloodGroup": { "type": "string" },
+        "hospitalName": { "type": "string" },
+        "city": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "urgency": { "type": "string" },
+        "status": { "type": "string" }
       }
     },
     "financialTransactions": {
@@ -161,9 +292,7 @@
         "category": { "type": "string" },
         "amount": { "type": "number" },
         "description": { "type": "string" },
-        "date": { "type": "string" },
-        "receiptUrl": { "type": "string" },
-        "auditedBy": { "type": "string" }
+        "date": { "type": "string" }
       }
     },
     "events": {
@@ -176,12 +305,7 @@
         "category": { "type": "string" },
         "date": { "type": "string" },
         "time": { "type": "string" },
-        "location": { "type": "string" },
-        "isOnline": { "type": "boolean" },
-        "meetingLink": { "type": "string" },
-        "description": { "type": "string" },
-        "registeredCount": { "type": "number" },
-        "image": { "type": "string" }
+        "location": { "type": "string" }
       }
     },
     "elections": {
@@ -192,11 +316,7 @@
         "id": { "type": "string" },
         "title": { "type": "string" },
         "term": { "type": "string" },
-        "status": { "type": "string" },
-        "startDate": { "type": "string" },
-        "endDate": { "type": "string" },
-        "totalVotesCast": { "type": "number" },
-        "positions": { "type": "array" }
+        "status": { "type": "string" }
       }
     },
     "memories": {
@@ -208,13 +328,8 @@
         "title": { "type": "string" },
         "caption": { "type": "string" },
         "year": { "type": "number" },
-        "house": { "type": "string" },
-        "submittedByName": { "type": "string" },
-        "submittedByBatch": { "type": "number" },
         "imageUrl": { "type": "string" },
-        "likesCount": { "type": "number" },
-        "isApproved": { "type": "boolean" },
-        "createdAt": { "type": "string" }
+        "isApproved": { "type": "boolean" }
       }
     },
     "achievements": {
@@ -227,11 +342,7 @@
         "alumniName": { "type": "string" },
         "batchYear": { "type": "number" },
         "category": { "type": "string" },
-        "description": { "type": "string" },
-        "award": { "type": "string" },
-        "imageUrl": { "type": "string" },
-        "isApproved": { "type": "boolean" },
-        "createdAt": { "type": "string" }
+        "isApproved": { "type": "boolean" }
       }
     },
     "auditLogs": {
@@ -276,6 +387,38 @@
     "/donations/{donationId}": {
       "schema": "donations",
       "description": "Donations records"
+    },
+    "/payment_settings/{settingId}": {
+      "schema": "paymentSettings",
+      "description": "Payment and 80G tax settings"
+    },
+    "/school_settings/{settingId}": {
+      "schema": "schoolSettings",
+      "description": "School settings"
+    },
+    "/notices/{noticeId}": {
+      "schema": "notices",
+      "description": "Notices and circulars"
+    },
+    "/faculty/{facultyId}": {
+      "schema": "faculty",
+      "description": "Faculty and staff directory"
+    },
+    "/gallery/{galleryId}": {
+      "schema": "gallery",
+      "description": "Photo gallery items"
+    },
+    "/admission_enquiries/{enquiryId}": {
+      "schema": "admissionEnquiries",
+      "description": "Admission enquiries"
+    },
+    "/blood_donors/{donorId}": {
+      "schema": "bloodDonors",
+      "description": "Blood donors directory"
+    },
+    "/blood_requests/{requestId}": {
+      "schema": "bloodRequests",
+      "description": "Emergency blood requests"
     },
     "/financialTransactions/{txId}": {
       "schema": "financialTransactions",

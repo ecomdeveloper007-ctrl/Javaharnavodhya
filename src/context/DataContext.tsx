@@ -1,20 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   AlumniProfile,
-  BatchInfo,
-  BusinessListing,
-  JobPosting,
-  WelfareCase,
-  DonationCampaign,
-  DonationRecord,
-  FinancialTransaction,
-  FinancialReport,
   AlumniEvent,
   EventRSVP,
-  Election,
-  ElectionNomination,
-  ElectionVote,
-  ElectionAuditLog,
+  BloodDonor,
+  BloodRequest,
+  DonationCampaign,
+  DonationRecord,
+  PaymentSettings,
+  JobPosting,
+  BusinessListing,
+  WelfareCase,
   AlumniMemory,
   Achievement,
   SchoolNotice,
@@ -22,59 +18,71 @@ import {
   GalleryItem,
   AdmissionEnquiry,
   UserAuth,
-  UserRole,
-  RolePermission,
-  SchoolSettings,
   BoardTopper,
   VMCLeader,
   HouseInfo,
-  BloodDonor,
-  BloodRequest,
-  BloodGroup
+  SchoolSettings,
+  BatchInfo,
+  Election,
+  ElectionNomination,
+  ElectionVote,
+  ElectionAuditLog,
+  FinancialReport,
+  FinancialTransaction,
+  UserRole,
+  CSVImportResult
 } from '../types';
 import {
   SEED_ALUMNI,
-  SEED_BATCHES,
-  SEED_BUSINESSES,
-  SEED_JOBS,
-  SEED_WELFARE_CASES,
-  SEED_DONATION_CAMPAIGNS,
-  SEED_BLOOD_DONORS,
-  SEED_BLOOD_REQUESTS,
-  SEED_TRANSACTIONS,
-  SEED_FINANCIAL_REPORTS,
   SEED_EVENTS,
   SEED_EVENT_RSVPS,
-  SEED_ELECTIONS,
-  SEED_NOMINATIONS,
-  SEED_AUDIT_LOGS,
+  SEED_BLOOD_DONORS,
+  SEED_BLOOD_REQUESTS,
+  SEED_DONATION_CAMPAIGNS,
+  SEED_DONATIONS,
+  SEED_PAYMENT_SETTINGS,
+  SEED_JOBS,
+  SEED_BUSINESSES,
+  SEED_WELFARE_CASES,
   SEED_MEMORIES,
   SEED_ACHIEVEMENTS,
   SEED_NOTICES,
   SEED_FACULTY,
   SEED_GALLERY,
   SEED_ADMISSION_ENQUIRIES,
-  SEED_ROLES_PERMISSIONS,
-  SEED_SCHOOL_SETTINGS,
-  SEED_HOUSES,
   SEED_TOPPERS,
-  SEED_VMC_MEMBERS
+  SEED_VMC_MEMBERS,
+  SEED_HOUSES,
+  SEED_SCHOOL_SETTINGS,
+  SEED_BATCHES,
+  SEED_ELECTIONS,
+  SEED_NOMINATIONS,
+  SEED_AUDIT_LOGS,
+  SEED_FINANCIAL_REPORTS,
+  SEED_TRANSACTIONS,
+  SEED_ROLES_PERMISSIONS
 } from '../data/seedData';
-import { auth, signInWithGoogle, logoutUser, AuthErrorDetails, db } from '../firebase';
+import { auth, signInWithGoogle, logoutUser } from '../firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
+import {
+  syncCollectionWithFirestore,
+  syncSingletonWithFirestore,
+  saveDocToFirestore,
+  updateDocInFirestore,
+  deleteDocFromFirestore
+} from '../services/firestoreSync';
+import { CSV_TEMPLATES, parseCSVLines, formatAsCSV } from '../utils/csvProcessor';
 
-export interface CSVImportResult {
-  success: boolean;
-  importedCount: number;
-  updatedCount: number;
-  duplicateCount: number;
-  totalProcessed: number;
-  errors: string[];
-  message: string;
+export type { CSVImportResult } from '../types';
+
+export interface AuthErrorDetails {
+  code?: string;
+  message?: string;
+  domain?: string;
 }
 
-interface DataContextType {
-  // Auth & RBAC
+export interface DataContextType {
+  // Authentication & RBAC
   user: UserAuth | null;
   currentRole: UserRole;
   setCurrentRole: (role: UserRole) => void;
@@ -82,15 +90,15 @@ interface DataContextType {
   hasPermission: (permission: string) => boolean;
   loginWithGoogle: () => Promise<void>;
   loginDirectlyAsSuperAdmin: () => void;
-  loginDirectlyAs: (emailOrId: string, role?: UserRole) => void;
-  simulateLoginAs: (alumniId: string, customProfile?: Partial<AlumniProfile>, role?: UserRole) => void;
-  logout: () => Promise<void>;
+  loginDirectlyAs: (emailOrId: string, roleOverride?: UserRole) => void;
+  simulateLoginAs: (role: UserRole) => void;
+  logout: () => void;
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
   authError: AuthErrorDetails | null;
   setAuthError: (err: AuthErrorDetails | null) => void;
 
-  // School CMS & Global Settings
+  // School Settings & CMS
   schoolSettings: SchoolSettings;
   updateSchoolSettings: (updates: Partial<SchoolSettings>) => void;
   houses: HouseInfo[];
@@ -104,30 +112,30 @@ interface DataContextType {
   updateVMCMember: (id: string, updates: Partial<VMCLeader>) => void;
   deleteVMCMember: (id: string) => void;
 
-  // School Notices & Circulars
+  // School Notices
   notices: SchoolNotice[];
   addNotice: (notice: Omit<SchoolNotice, 'id'>) => void;
-  updateNotice: (id: string, notice: Partial<SchoolNotice>) => void;
+  updateNotice: (id: string, updates: Partial<SchoolNotice>) => void;
   deleteNotice: (id: string) => void;
 
-  // Faculty & Staff Directory
+  // Faculty & Staff
   faculty: FacultyMember[];
   addFaculty: (faculty: Omit<FacultyMember, 'id'>) => void;
-  updateFaculty: (id: string, faculty: Partial<FacultyMember>) => void;
+  updateFaculty: (id: string, updates: Partial<FacultyMember>) => void;
   deleteFaculty: (id: string) => void;
 
-  // Gallery & Media
+  // Gallery
   gallery: GalleryItem[];
   addGalleryItem: (item: Omit<GalleryItem, 'id'>) => void;
   deleteGalleryItem: (id: string) => void;
 
-  // Admissions & Inquiries
+  // Admission Enquiries
   admissionEnquiries: AdmissionEnquiry[];
   submitAdmissionEnquiry: (enquiry: Omit<AdmissionEnquiry, 'id' | 'createdAt' | 'status'>) => void;
   updateEnquiryStatus: (id: string, status: AdmissionEnquiry['status']) => void;
   deleteAdmissionEnquiry: (id: string) => void;
 
-  // Alumni Directory & Moderation
+  // Alumni Directory & Profiles
   alumni: AlumniProfile[];
   batches: BatchInfo[];
   updateBatchInfo: (passoutYear: number, updates: Partial<BatchInfo>) => void;
@@ -155,26 +163,33 @@ interface DataContextType {
   rejectJob: (id: string) => void;
   deleteJob: (id: string) => void;
 
-  // Welfare & Campaigns
+  // Welfare & Relief
   welfareCases: WelfareCase[];
-  addWelfareCase: (welfare: Omit<WelfareCase, 'id' | 'createdAt'>) => void;
+  addWelfareCase: (welfareCase: Omit<WelfareCase, 'id' | 'createdAt'>) => void;
   updateWelfareCase: (id: string, updates: Partial<WelfareCase>) => void;
   deleteWelfareCase: (id: string) => void;
+
+  // Donations & Payments
   donationCampaigns: DonationCampaign[];
-  addDonationCampaign: (camp: Omit<DonationCampaign, 'id' | 'createdAt' | 'currentAmount' | 'donorsCount'>) => void;
+  addDonationCampaign: (campaign: Omit<DonationCampaign, 'id' | 'createdAt' | 'currentAmount' | 'donorsCount'>) => void;
   updateDonationCampaign: (id: string, updates: Partial<DonationCampaign>) => void;
   deleteDonationCampaign: (id: string) => void;
   donationRecords: DonationRecord[];
   recordDonation: (donation: Omit<DonationRecord, 'id' | 'createdAt' | 'paymentStatus' | 'transactionRef' | 'receiptNumber' | 'taxExempt80GRegNo'>) => DonationRecord;
+  verifyDonationRecord: (donationId: string, verifiedBy: string) => void;
+  rejectDonationRecord: (donationId: string, reason: string) => void;
+  deleteDonationRecord: (donationId: string) => void;
+  paymentSettings: PaymentSettings;
+  updatePaymentSettings: (updates: Partial<PaymentSettings>) => void;
 
-  // Blood Donation Lifeline Network
+  // Blood Donation Lifeline
   bloodDonors: BloodDonor[];
   addBloodDonor: (donor: Omit<BloodDonor, 'id' | 'createdAt' | 'isVerified'>) => void;
   updateBloodDonor: (id: string, updates: Partial<BloodDonor>) => void;
   deleteBloodDonor: (id: string) => void;
   toggleBloodDonorAvailability: (id: string) => void;
   bloodRequests: BloodRequest[];
-  submitBloodRequest: (req: Omit<BloodRequest, 'id' | 'createdAt' | 'status' | 'verifiedByNavodaya'>) => void;
+  submitBloodRequest: (request: Omit<BloodRequest, 'id' | 'createdAt' | 'status' | 'verifiedByNavodaya'>) => void;
   updateBloodRequestStatus: (id: string, status: BloodRequest['status']) => void;
   deleteBloodRequest: (id: string) => void;
 
@@ -184,11 +199,11 @@ interface DataContextType {
   approveMemory: (id: string) => void;
   rejectMemory: (id: string) => void;
   deleteMemory: (id: string) => void;
-  likeMemory: (memoryId: string) => void;
+  likeMemory: (id: string) => void;
 
   // Achievements & Hall of Fame
   achievements: Achievement[];
-  addAchievement: (ach: Omit<Achievement, 'id' | 'createdAt'>) => void;
+  addAchievement: (achievement: Omit<Achievement, 'id' | 'createdAt'>) => void;
   updateAchievement: (id: string, updates: Partial<Achievement>) => void;
   approveAchievement: (id: string) => void;
   rejectAchievement: (id: string) => void;
@@ -230,10 +245,11 @@ interface DataContextType {
 
   // CSV Import & Export Suite
   exportToCSV: (moduleType: string, customRows?: any[]) => void;
-  importFromCSV: (moduleType: string, csvContent: string, updateExisting?: boolean) => CSVImportResult;
+  importFromCSV: (moduleType: string, csvContent: string, updateExisting?: boolean) => Promise<CSVImportResult>;
   getCSVTemplate: (moduleType: string) => string;
 
-  // System & Reset
+  // Persistence State & System
+  isPersistenceLoaded: boolean;
   resetToDefaultSeedData: () => void;
 
   // Navigation & UI State
@@ -260,7 +276,7 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Navigation & View State
+  // Navigation & UI Modal State
   const [activeTab, setActiveTab] = useState<string>('home');
   const [activeAlumniSubTab, setActiveAlumniSubTab] = useState<string>('directory');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -272,6 +288,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authError, setAuthError] = useState<AuthErrorDetails | null>(null);
   const [selectedCampaignForDonation, setSelectedCampaignForDonation] = useState<DonationCampaign | null>(null);
   const [lastGeneratedReceipt, setLastGeneratedReceipt] = useState<DonationRecord | null>(null);
+  const [isPersistenceLoaded, setIsPersistenceLoaded] = useState<boolean>(false);
 
   // User & RBAC state
   const [currentRole, setCurrentRole] = useState<UserRole>('guest');
@@ -284,8 +301,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [user, setUser] = useState<UserAuth | null>(null);
 
-  // State collections initialized from rich seeds
+  // Dynamic State collections initialized with standard default fallbacks
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings>(SEED_SCHOOL_SETTINGS);
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(SEED_PAYMENT_SETTINGS);
   const [houses, setHouses] = useState<HouseInfo[]>(SEED_HOUSES as HouseInfo[]);
   const [toppers, setToppers] = useState<BoardTopper[]>(SEED_TOPPERS);
   const [vmcMembers, setVmcMembers] = useState<VMCLeader[]>(SEED_VMC_MEMBERS);
@@ -301,7 +319,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [jobs, setJobs] = useState<JobPosting[]>(SEED_JOBS);
   const [welfareCases, setWelfareCases] = useState<WelfareCase[]>(SEED_WELFARE_CASES);
   const [donationCampaigns, setDonationCampaigns] = useState<DonationCampaign[]>(SEED_DONATION_CAMPAIGNS);
-  const [donationRecords, setDonationRecords] = useState<DonationRecord[]>([]);
+  const [donationRecords, setDonationRecords] = useState<DonationRecord[]>(SEED_DONATIONS);
   const [bloodDonors, setBloodDonors] = useState<BloodDonor[]>(SEED_BLOOD_DONORS);
   const [bloodRequests, setBloodRequests] = useState<BloodRequest[]>(SEED_BLOOD_REQUESTS);
   const [memories, setMemories] = useState<AlumniMemory[]>(SEED_MEMORIES);
@@ -318,6 +336,126 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [financialReports, setFinancialReports] = useState<FinancialReport[]>(SEED_FINANCIAL_REPORTS);
   const [ledgerTransactions, setLedgerTransactions] = useState<FinancialTransaction[]>(SEED_TRANSACTIONS);
 
+  // Load and Hydrate ALL Collections directly from Firestore
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAllFromFirestore() {
+      try {
+        const [
+          loadedSettings,
+          loadedPaymentSettings,
+          loadedHouses,
+          loadedToppers,
+          loadedVmc,
+          loadedNotices,
+          loadedFaculty,
+          loadedGallery,
+          loadedAdmissions,
+          loadedAlumni,
+          loadedBatches,
+          loadedBusinesses,
+          loadedJobs,
+          loadedWelfare,
+          loadedCampaigns,
+          loadedDonations,
+          loadedBloodDonors,
+          loadedBloodReqs,
+          loadedMemories,
+          loadedAchievements,
+          loadedEvents,
+          loadedEventRsvps,
+          loadedElection,
+          loadedNominations,
+          loadedVotes,
+          loadedAuditLogs,
+          loadedReports,
+          loadedTransactions,
+          loadedRoles
+        ] = await Promise.all([
+          syncSingletonWithFirestore('school_settings', 'current', SEED_SCHOOL_SETTINGS),
+          syncSingletonWithFirestore('payment_settings', 'current', SEED_PAYMENT_SETTINGS),
+          syncCollectionWithFirestore('houses', SEED_HOUSES as HouseInfo[]),
+          syncCollectionWithFirestore('toppers', SEED_TOPPERS),
+          syncCollectionWithFirestore('vmc_members', SEED_VMC_MEMBERS),
+          syncCollectionWithFirestore('notices', SEED_NOTICES),
+          syncCollectionWithFirestore('faculty', SEED_FACULTY),
+          syncCollectionWithFirestore('gallery', SEED_GALLERY),
+          syncCollectionWithFirestore('admission_enquiries', SEED_ADMISSION_ENQUIRIES),
+          syncCollectionWithFirestore('alumniProfiles', SEED_ALUMNI),
+          syncCollectionWithFirestore('batches', SEED_BATCHES),
+          syncCollectionWithFirestore('businesses', SEED_BUSINESSES),
+          syncCollectionWithFirestore('jobs', SEED_JOBS),
+          syncCollectionWithFirestore('welfareCases', SEED_WELFARE_CASES),
+          syncCollectionWithFirestore('donationCampaigns', SEED_DONATION_CAMPAIGNS),
+          syncCollectionWithFirestore('donations', SEED_DONATIONS),
+          syncCollectionWithFirestore('blood_donors', SEED_BLOOD_DONORS),
+          syncCollectionWithFirestore('blood_requests', SEED_BLOOD_REQUESTS),
+          syncCollectionWithFirestore('memories', SEED_MEMORIES),
+          syncCollectionWithFirestore('achievements', SEED_ACHIEVEMENTS),
+          syncCollectionWithFirestore('events', SEED_EVENTS),
+          syncCollectionWithFirestore('event_rsvps', SEED_EVENT_RSVPS),
+          syncSingletonWithFirestore('elections', 'current', SEED_ELECTIONS),
+          syncCollectionWithFirestore('nominations', SEED_NOMINATIONS),
+          syncCollectionWithFirestore('votes', []),
+          syncCollectionWithFirestore('auditLogs', SEED_AUDIT_LOGS),
+          syncCollectionWithFirestore('financial_reports', SEED_FINANCIAL_REPORTS),
+          syncCollectionWithFirestore('financialTransactions', SEED_TRANSACTIONS),
+          syncSingletonWithFirestore('user_roles', 'current_map', {
+            'prakashinfosys1234@gmail.com': 'super_admin',
+            'sunita.ias@rajasthan.gov.in': 'alumni_manager',
+            'vikram.shekhawat@google.com': 'election_officer',
+            'rajesh.ca@audit.in': 'auditor'
+          })
+        ]);
+
+        if (!isMounted) return;
+
+        if (loadedSettings) setSchoolSettings(loadedSettings);
+        if (loadedPaymentSettings) setPaymentSettings(loadedPaymentSettings);
+        if (loadedHouses && loadedHouses.length > 0) setHouses(loadedHouses);
+        if (loadedToppers && loadedToppers.length > 0) setToppers(loadedToppers);
+        if (loadedVmc && loadedVmc.length > 0) setVmcMembers(loadedVmc);
+        if (loadedNotices && loadedNotices.length > 0) setNotices(loadedNotices);
+        if (loadedFaculty && loadedFaculty.length > 0) setFaculty(loadedFaculty);
+        if (loadedGallery && loadedGallery.length > 0) setGallery(loadedGallery);
+        if (loadedAdmissions && loadedAdmissions.length > 0) setAdmissionEnquiries(loadedAdmissions);
+        if (loadedAlumni && loadedAlumni.length > 0) setAlumni(loadedAlumni);
+        if (loadedBatches && loadedBatches.length > 0) setBatches(loadedBatches);
+        if (loadedBusinesses && loadedBusinesses.length > 0) setBusinesses(loadedBusinesses);
+        if (loadedJobs && loadedJobs.length > 0) setJobs(loadedJobs);
+        if (loadedWelfare && loadedWelfare.length > 0) setWelfareCases(loadedWelfare);
+        if (loadedCampaigns && loadedCampaigns.length > 0) setDonationCampaigns(loadedCampaigns);
+        if (loadedDonations) setDonationRecords(loadedDonations);
+        if (loadedBloodDonors && loadedBloodDonors.length > 0) setBloodDonors(loadedBloodDonors);
+        if (loadedBloodReqs && loadedBloodReqs.length > 0) setBloodRequests(loadedBloodReqs);
+        if (loadedMemories && loadedMemories.length > 0) setMemories(loadedMemories);
+        if (loadedAchievements && loadedAchievements.length > 0) setAchievements(loadedAchievements);
+        if (loadedEvents && loadedEvents.length > 0) setEvents(loadedEvents);
+        if (loadedEventRsvps && loadedEventRsvps.length > 0) setEventRsvps(loadedEventRsvps);
+        if (loadedElection) setElection(loadedElection);
+        if (loadedNominations && loadedNominations.length > 0) setNominations(loadedNominations);
+        if (loadedVotes) setVotes(loadedVotes);
+        if (loadedAuditLogs && loadedAuditLogs.length > 0) setAuditLogs(loadedAuditLogs);
+        if (loadedReports && loadedReports.length > 0) setFinancialReports(loadedReports);
+        if (loadedTransactions && loadedTransactions.length > 0) setLedgerTransactions(loadedTransactions);
+        if (loadedRoles) setUserRolesMap(loadedRoles);
+      } catch (err) {
+        console.warn('Firestore initial sync notice:', err);
+      } finally {
+        if (isMounted) {
+          setIsPersistenceLoaded(true);
+        }
+      }
+    }
+
+    loadAllFromFirestore();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Sync user state with Firebase auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (fbUser: User | null) => {
@@ -326,15 +464,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const isSuperAdminEmail = userEmail === 'prakashinfosys1234@gmail.com';
         const mappedRole = userRolesMap[userEmail] || userRolesMap[fbUser.uid];
         const assignedRole: UserRole = isSuperAdminEmail ? 'super_admin' : (mappedRole || 'alumnus');
-        const isAuthorizedAdmin = assignedRole === 'super_admin' || assignedRole === 'alumni_manager' || assignedRole === 'election_officer' || assignedRole === 'auditor' || assignedRole === 'principal';
+        const isAuthorizedAdmin =
+          isSuperAdminEmail ||
+          assignedRole === 'super_admin' ||
+          assignedRole === 'alumni_manager' ||
+          assignedRole === 'election_officer' ||
+          assignedRole === 'auditor' ||
+          assignedRole === 'principal';
         const existingProfile = alumni.find(a => (a.email || '').toLowerCase() === userEmail);
-        
+
         setUser({
           uid: fbUser.uid,
           email: fbUser.email,
           displayName: fbUser.displayName || (existingProfile ? existingProfile.fullName : (isSuperAdminEmail ? 'Prakash (Super Admin)' : 'Alumnus')),
           photoURL: fbUser.photoURL || existingProfile?.avatar || null,
-          isAdmin: isSuperAdminEmail || isAuthorizedAdmin,
+          isAdmin: isAuthorizedAdmin,
           role: assignedRole,
           profile: existingProfile
         });
@@ -348,18 +492,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, [alumni, userRolesMap]);
 
-  // Role Assignment
+  // Role Assignment with Firestore Sync
   const assignUserRole = (alumniIdOrEmail: string, role: UserRole) => {
     const key = (alumniIdOrEmail || '').toLowerCase().trim();
-    setUserRolesMap(prev => ({
-      ...prev,
+    const nextMap = {
+      ...userRolesMap,
       [key]: role
-    }));
+    };
+    setUserRolesMap(nextMap);
+    saveDocToFirestore('user_roles', 'current_map', nextMap);
 
     if (user && (user.uid === alumniIdOrEmail || (user.email || '').toLowerCase().trim() === key)) {
       const isSuperAdmin = key === 'prakashinfosys1234@gmail.com' || role === 'super_admin';
       const isAuthorizedAdmin = isSuperAdmin || role === 'alumni_manager' || role === 'election_officer' || role === 'auditor' || role === 'principal';
-      setUser(prev => prev ? { ...prev, role, isAdmin: isAuthorizedAdmin } : null);
+      setUser(prev => (prev ? { ...prev, role, isAdmin: isAuthorizedAdmin } : null));
       setCurrentRole(role);
     }
   };
@@ -399,7 +545,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsAuthModalOpen(false);
       }
     } catch (e: any) {
-      console.warn("Sign-in notice:", e);
+      console.warn('Sign-in notice:', e);
       setAuthError(e);
       setIsAuthModalOpen(true);
     }
@@ -449,57 +595,68 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthModalOpen(false);
   };
 
-  const simulateLoginAs = (alumniId: string, customProfileData?: Partial<AlumniProfile>, roleOverride?: UserRole) => {
-    let alum = alumni.find(a => a.id === alumniId);
-    
-    if (!alum && customProfileData) {
-      const newProfile: AlumniProfile = {
-        id: alumniId,
-        fullName: customProfileData.fullName || 'Navodaya Alumnus',
-        email: customProfileData.email || 'alumni@jnv.in',
-        batchYear: customProfileData.batchYear || 2012,
-        city: customProfileData.city || 'Barmer',
-        state: customProfileData.state || 'Rajasthan',
-        country: 'India',
-        profession: customProfileData.profession || 'Professional',
-        company: customProfileData.company || 'Enterprise',
-        designation: customProfileData.designation || 'Lead',
-        industry: customProfileData.industry || 'Technology & Services',
-        bio: customProfileData.bio || 'Proud Navodayan of JNV Pachpadra',
-        avatar: customProfileData.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop',
-        isMentorAvailable: true,
-        isBusinessOwner: false,
-        isLookingForJobs: false,
-        isHiring: false,
-        verificationStatus: 'verified',
-        createdAt: new Date().toISOString()
-      };
-      setAlumni(prev => [newProfile, ...prev]);
-      alum = newProfile;
-    } else if (!alum) {
-      alum = alumni[0];
-    }
+  const simulateLoginAs = (role: UserRole) => {
+    const defaultProfiles: Record<UserRole, { name: string; email: string; avatar: string }> = {
+      super_admin: {
+        name: 'Prakash (Super Admin)',
+        email: 'prakashinfosys1234@gmail.com',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop'
+      },
+      alumni_manager: {
+        name: 'Sunita Sharma (Alumni Admin)',
+        email: 'sunita.ias@rajasthan.gov.in',
+        avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&h=150&fit=crop'
+      },
+      election_officer: {
+        name: 'Col. Vikram Singh (Election Officer)',
+        email: 'vikram.shekhawat@google.com',
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop'
+      },
+      auditor: {
+        name: 'CA Rajesh Sharma (Statutory Auditor)',
+        email: 'rajesh.ca@audit.in',
+        avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop'
+      },
+      principal: {
+        name: 'Dr. R.K. Sharma (Principal & Patron)',
+        email: 'principal-jnvpachpadra@gov.in',
+        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop'
+      },
+      alumnus: {
+        name: 'Ravi Kumar (Verified Alumnus)',
+        email: 'ravi.kumar@example.com',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop'
+      },
+      guest: {
+        name: 'Guest Visitor',
+        email: 'guest@visitor.in',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop'
+      }
+    };
 
-    const assignedRole = roleOverride || (alum.email === 'prakashinfosys1234@gmail.com' ? 'super_admin' : 'alumnus');
+    const targetProfile = defaultProfiles[role];
+    const isAuthorized = role === 'super_admin' || role === 'alumni_manager' || role === 'election_officer' || role === 'auditor' || role === 'principal';
+    const matchAlum = alumni.find(a => (a.email || '').toLowerCase() === targetProfile.email.toLowerCase()) || alumni[0];
 
     setUser({
-      uid: alum.id,
-      email: alum.email,
-      displayName: alum.fullName,
-      photoURL: alum.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop',
-      isAdmin: assignedRole === 'super_admin',
-      role: assignedRole,
-      profile: alum
+      uid: `simulated-${role}`,
+      email: targetProfile.email,
+      displayName: targetProfile.name,
+      photoURL: targetProfile.avatar,
+      isAdmin: isAuthorized,
+      role: role,
+      profile: matchAlum
     });
-    setCurrentRole(assignedRole);
+    setCurrentRole(role);
     setAuthError(null);
+    setIsAuthModalOpen(false);
   };
 
   const logout = async () => {
     try {
       await logoutUser();
     } catch (e) {
-      console.warn("Logout note", e);
+      console.warn('Logout notice', e);
     }
     setUser(null);
     setCurrentRole('guest');
@@ -508,13 +665,32 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // School Settings & CMS
+  // School Settings & CMS Mutations with Firestore
   const updateSchoolSettings = (updates: Partial<SchoolSettings>) => {
-    setSchoolSettings(prev => ({ ...prev, ...updates }));
+    setSchoolSettings(prev => {
+      const next = { ...prev, ...updates };
+      saveDocToFirestore('school_settings', 'current', next);
+      return next;
+    });
+  };
+
+  const updatePaymentSettings = (updates: Partial<PaymentSettings>) => {
+    setPaymentSettings(prev => {
+      const next = { ...prev, ...updates, updatedAt: new Date().toISOString() };
+      saveDocToFirestore('payment_settings', 'current', next);
+      return next;
+    });
   };
 
   const updateHouse = (id: string, updates: Partial<HouseInfo>) => {
-    setHouses(prev => prev.map(h => (h.id === id ? { ...h, ...updates } : h)));
+    setHouses(prev => {
+      const next = prev.map(h => (h.id === id ? { ...h, ...updates } : h));
+      const target = next.find(h => h.id === id);
+      if (target) {
+        saveDocToFirestore('houses', id, target);
+      }
+      return next;
+    });
   };
 
   const addTopper = (topper: Omit<BoardTopper, 'id'>) => {
@@ -523,14 +699,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: `top-${Date.now()}`
     };
     setToppers(prev => [newTop, ...prev]);
+    saveDocToFirestore('toppers', newTop.id, newTop);
   };
 
   const updateTopper = (id: string, updates: Partial<BoardTopper>) => {
-    setToppers(prev => prev.map(t => (t.id === id ? { ...t, ...updates } : t)));
+    setToppers(prev => {
+      const next = prev.map(t => (t.id === id ? { ...t, ...updates } : t));
+      const target = next.find(t => t.id === id);
+      if (target) {
+        saveDocToFirestore('toppers', id, target);
+      }
+      return next;
+    });
   };
 
   const deleteTopper = (id: string) => {
     setToppers(prev => prev.filter(t => t.id !== id));
+    deleteDocFromFirestore('toppers', id);
   };
 
   const addVMCMember = (member: Omit<VMCLeader, 'id'>) => {
@@ -539,64 +724,93 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: `vmc-${Date.now()}`
     };
     setVmcMembers(prev => [...prev, newMem]);
+    saveDocToFirestore('vmc_members', newMem.id, newMem);
   };
 
   const updateVMCMember = (id: string, updates: Partial<VMCLeader>) => {
-    setVmcMembers(prev => prev.map(m => (m.id === id ? { ...m, ...updates } : m)));
+    setVmcMembers(prev => {
+      const next = prev.map(m => (m.id === id ? { ...m, ...updates } : m));
+      const target = next.find(m => m.id === id);
+      if (target) {
+        saveDocToFirestore('vmc_members', id, target);
+      }
+      return next;
+    });
   };
 
   const deleteVMCMember = (id: string) => {
     setVmcMembers(prev => prev.filter(m => m.id !== id));
+    deleteDocFromFirestore('vmc_members', id);
   };
 
-  // School Notices Operations
+  // School Notices Operations with Firestore
   const addNotice = (notice: Omit<SchoolNotice, 'id'>) => {
     const newNotice: SchoolNotice = {
       ...notice,
       id: `not-${Date.now()}`
     };
     setNotices(prev => [newNotice, ...prev]);
+    saveDocToFirestore('notices', newNotice.id, newNotice);
   };
 
   const updateNotice = (id: string, updates: Partial<SchoolNotice>) => {
-    setNotices(prev => prev.map(n => (n.id === id ? { ...n, ...updates } : n)));
+    setNotices(prev => {
+      const next = prev.map(n => (n.id === id ? { ...n, ...updates } : n));
+      const target = next.find(n => n.id === id);
+      if (target) {
+        saveDocToFirestore('notices', id, target);
+      }
+      return next;
+    });
   };
 
   const deleteNotice = (id: string) => {
     setNotices(prev => prev.filter(n => n.id !== id));
+    deleteDocFromFirestore('notices', id);
   };
 
-  // Faculty & Staff
+  // Faculty & Staff with Firestore
   const addFaculty = (fac: Omit<FacultyMember, 'id'>) => {
     const newFac: FacultyMember = {
       ...fac,
       id: `fac-${Date.now()}`
     };
     setFaculty(prev => [...prev, newFac]);
+    saveDocToFirestore('faculty', newFac.id, newFac);
   };
 
   const updateFaculty = (id: string, updates: Partial<FacultyMember>) => {
-    setFaculty(prev => prev.map(f => (f.id === id ? { ...f, ...updates } : f)));
+    setFaculty(prev => {
+      const next = prev.map(f => (f.id === id ? { ...f, ...updates } : f));
+      const target = next.find(f => f.id === id);
+      if (target) {
+        saveDocToFirestore('faculty', id, target);
+      }
+      return next;
+    });
   };
 
   const deleteFaculty = (id: string) => {
     setFaculty(prev => prev.filter(f => f.id !== id));
+    deleteDocFromFirestore('faculty', id);
   };
 
-  // Gallery
+  // Gallery with Firestore
   const addGalleryItem = (item: Omit<GalleryItem, 'id'>) => {
     const newItem: GalleryItem = {
       ...item,
       id: `gal-${Date.now()}`
     };
     setGallery(prev => [newItem, ...prev]);
+    saveDocToFirestore('gallery', newItem.id, newItem);
   };
 
   const deleteGalleryItem = (id: string) => {
     setGallery(prev => prev.filter(g => g.id !== id));
+    deleteDocFromFirestore('gallery', id);
   };
 
-  // Admission Enquiries
+  // Admission Enquiries with Firestore
   const submitAdmissionEnquiry = (enquiry: Omit<AdmissionEnquiry, 'id' | 'createdAt' | 'status'>) => {
     const newEnq: AdmissionEnquiry = {
       ...enquiry,
@@ -605,42 +819,53 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString()
     };
     setAdmissionEnquiries(prev => [newEnq, ...prev]);
+    saveDocToFirestore('admission_enquiries', newEnq.id, newEnq);
   };
 
   const updateEnquiryStatus = (id: string, status: AdmissionEnquiry['status']) => {
-    setAdmissionEnquiries(prev => prev.map(e => (e.id === id ? { ...e, status } : e)));
+    setAdmissionEnquiries(prev => {
+      const next = prev.map(e => (e.id === id ? { ...e, status } : e));
+      updateDocInFirestore('admission_enquiries', id, { status });
+      return next;
+    });
   };
 
   const deleteAdmissionEnquiry = (id: string) => {
     setAdmissionEnquiries(prev => prev.filter(e => e.id !== id));
+    deleteDocFromFirestore('admission_enquiries', id);
   };
 
-  // Alumni Directory & Moderation
+  // Alumni Directory & Moderation with Firestore
   const approveAlumni = (id: string) => {
+    const verifiedAt = new Date().toISOString();
+    const verifiedBy = user?.displayName || 'Administrator';
     setAlumni(prev =>
       prev.map(a =>
         a.id === id
           ? {
               ...a,
               verificationStatus: 'verified',
-              verifiedAt: new Date().toISOString(),
-              verifiedBy: user?.displayName || 'Administrator'
+              verifiedAt,
+              verifiedBy
             }
           : a
       )
     );
+    updateDocInFirestore('alumniProfiles', id, {
+      verificationStatus: 'verified',
+      verifiedAt,
+      verifiedBy
+    });
   };
 
   const rejectAlumni = (id: string) => {
-    setAlumni(prev =>
-      prev.map(a => (a.id === id ? { ...a, verificationStatus: 'rejected' } : a))
-    );
+    setAlumni(prev => prev.map(a => (a.id === id ? { ...a, verificationStatus: 'rejected' } : a)));
+    updateDocInFirestore('alumniProfiles', id, { verificationStatus: 'rejected' });
   };
 
   const deactivateAlumni = (id: string) => {
-    setAlumni(prev =>
-      prev.map(a => (a.id === id ? { ...a, verificationStatus: 'deactivated' } : a))
-    );
+    setAlumni(prev => prev.map(a => (a.id === id ? { ...a, verificationStatus: 'deactivated' } : a)));
+    updateDocInFirestore('alumniProfiles', id, { verificationStatus: 'deactivated' });
   };
 
   const addAlumnusDirectly = (profileData: Omit<AlumniProfile, 'id' | 'createdAt'>) => {
@@ -650,14 +875,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString()
     };
     setAlumni(prev => [newProfile, ...prev]);
+    saveDocToFirestore('alumniProfiles', newProfile.id, newProfile);
   };
 
   const updateAlumniProfile = (id: string, updates: Partial<AlumniProfile>) => {
-    setAlumni(prev => prev.map(a => (a.id === id ? { ...a, ...updates } : a)));
+    setAlumni(prev => {
+      const next = prev.map(a => (a.id === id ? { ...a, ...updates } : a));
+      const target = next.find(a => a.id === id);
+      if (target) {
+        saveDocToFirestore('alumniProfiles', id, target);
+      }
+      return next;
+    });
   };
 
   const deleteAlumni = (id: string) => {
     setAlumni(prev => prev.filter(a => a.id !== id));
+    deleteDocFromFirestore('alumniProfiles', id);
   };
 
   const registerAlumni = (profileData: Omit<AlumniProfile, 'id' | 'createdAt' | 'verificationStatus'>) => {
@@ -668,13 +902,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString()
     };
     setAlumni(prev => [newProfile, ...prev]);
+    saveDocToFirestore('alumniProfiles', newProfile.id, newProfile);
   };
 
   const updateBatchInfo = (passoutYear: number, updates: Partial<BatchInfo>) => {
-    setBatches(prev => prev.map(b => (b.passoutYear === passoutYear ? { ...b, ...updates } : b)));
+    setBatches(prev => {
+      const next = prev.map(b => (b.passoutYear === passoutYear ? { ...b, ...updates } : b));
+      const target = next.find(b => b.passoutYear === passoutYear);
+      if (target) {
+        saveDocToFirestore('batches', String(passoutYear), target);
+      }
+      return next;
+    });
   };
 
-  // Business Directory
+  // Business Directory with Firestore
   const addBusiness = (bizData: Omit<BusinessListing, 'id' | 'createdAt' | 'isVerified'>) => {
     const newBiz: BusinessListing = {
       ...bizData,
@@ -683,25 +925,36 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString()
     };
     setBusinesses(prev => [newBiz, ...prev]);
+    saveDocToFirestore('businesses', newBiz.id, newBiz);
   };
 
   const updateBusiness = (id: string, updates: Partial<BusinessListing>) => {
-    setBusinesses(prev => prev.map(b => (b.id === id ? { ...b, ...updates } : b)));
+    setBusinesses(prev => {
+      const next = prev.map(b => (b.id === id ? { ...b, ...updates } : b));
+      const target = next.find(b => b.id === id);
+      if (target) {
+        saveDocToFirestore('businesses', id, target);
+      }
+      return next;
+    });
   };
 
   const approveBusiness = (id: string) => {
     setBusinesses(prev => prev.map(b => (b.id === id ? { ...b, isVerified: true } : b)));
+    updateDocInFirestore('businesses', id, { isVerified: true });
   };
 
   const rejectBusiness = (id: string) => {
     setBusinesses(prev => prev.map(b => (b.id === id ? { ...b, isVerified: false } : b)));
+    updateDocInFirestore('businesses', id, { isVerified: false });
   };
 
   const deleteBusiness = (id: string) => {
     setBusinesses(prev => prev.filter(b => b.id !== id));
+    deleteDocFromFirestore('businesses', id);
   };
 
-  // Job Board
+  // Job Board with Firestore
   const addJob = (jobData: Omit<JobPosting, 'id' | 'createdAt' | 'isActive'>) => {
     const newJob: JobPosting = {
       ...jobData,
@@ -710,25 +963,36 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString()
     };
     setJobs(prev => [newJob, ...prev]);
+    saveDocToFirestore('jobs', newJob.id, newJob);
   };
 
   const updateJob = (id: string, updates: Partial<JobPosting>) => {
-    setJobs(prev => prev.map(j => (j.id === id ? { ...j, ...updates } : j)));
+    setJobs(prev => {
+      const next = prev.map(j => (j.id === id ? { ...j, ...updates } : j));
+      const target = next.find(j => j.id === id);
+      if (target) {
+        saveDocToFirestore('jobs', id, target);
+      }
+      return next;
+    });
   };
 
   const approveJob = (id: string) => {
     setJobs(prev => prev.map(j => (j.id === id ? { ...j, isActive: true } : j)));
+    updateDocInFirestore('jobs', id, { isActive: true });
   };
 
   const rejectJob = (id: string) => {
     setJobs(prev => prev.map(j => (j.id === id ? { ...j, isActive: false } : j)));
+    updateDocInFirestore('jobs', id, { isActive: false });
   };
 
   const deleteJob = (id: string) => {
     setJobs(prev => prev.filter(j => j.id !== id));
+    deleteDocFromFirestore('jobs', id);
   };
 
-  // Welfare & Campaigns
+  // Welfare Cases with Firestore
   const addWelfareCase = (welfare: Omit<WelfareCase, 'id' | 'createdAt'>) => {
     const newCase: WelfareCase = {
       ...welfare,
@@ -736,16 +1000,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString()
     };
     setWelfareCases(prev => [newCase, ...prev]);
+    saveDocToFirestore('welfareCases', newCase.id, newCase);
   };
 
   const updateWelfareCase = (id: string, updates: Partial<WelfareCase>) => {
-    setWelfareCases(prev => prev.map(w => (w.id === id ? { ...w, ...updates } : w)));
+    setWelfareCases(prev => {
+      const next = prev.map(w => (w.id === id ? { ...w, ...updates } : w));
+      const target = next.find(w => w.id === id);
+      if (target) {
+        saveDocToFirestore('welfareCases', id, target);
+      }
+      return next;
+    });
   };
 
   const deleteWelfareCase = (id: string) => {
     setWelfareCases(prev => prev.filter(w => w.id !== id));
+    deleteDocFromFirestore('welfareCases', id);
   };
 
+  // Donation Campaigns with Firestore
   const addDonationCampaign = (camp: Omit<DonationCampaign, 'id' | 'createdAt' | 'currentAmount' | 'donorsCount'>) => {
     const newCamp: DonationCampaign = {
       ...camp,
@@ -755,17 +1029,192 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString()
     };
     setDonationCampaigns(prev => [newCamp, ...prev]);
+    saveDocToFirestore('donationCampaigns', newCamp.id, newCamp);
   };
 
   const updateDonationCampaign = (id: string, updates: Partial<DonationCampaign>) => {
-    setDonationCampaigns(prev => prev.map(c => (c.id === id ? { ...c, ...updates } : c)));
+    setDonationCampaigns(prev => {
+      const next = prev.map(c => (c.id === id ? { ...c, ...updates } : c));
+      const target = next.find(c => c.id === id);
+      if (target) {
+        saveDocToFirestore('donationCampaigns', id, target);
+      }
+      return next;
+    });
   };
 
   const deleteDonationCampaign = (id: string) => {
     setDonationCampaigns(prev => prev.filter(c => c.id !== id));
+    deleteDocFromFirestore('donationCampaigns', id);
   };
 
-  // Memories & Nostalgia
+  // Donation Records with Firestore
+  const recordDonation = (donationData: Omit<DonationRecord, 'id' | 'createdAt' | 'paymentStatus' | 'transactionRef' | 'receiptNumber' | 'taxExempt80GRegNo'>): DonationRecord => {
+    const currentYear = new Date().getFullYear();
+    const nextYearSuffix = (currentYear + 1).toString().slice(-2);
+    const randomSeq = Math.floor(1000 + Math.random() * 9000);
+    const txnCode = Math.floor(100000 + Math.random() * 900000);
+
+    const newRecord: DonationRecord = {
+      ...donationData,
+      id: `don-${Date.now()}`,
+      receiptNumber: `80G/JNVPAA/${currentYear}-${nextYearSuffix}/${randomSeq}`,
+      taxExempt80GRegNo: paymentSettings.reg80GNumber || 'CIT(E)/JNVPAA/80G/2012-13/894',
+      transactionRef: `JNV80G-${txnCode}`,
+      paymentStatus: 'SUCCESS',
+      createdAt: new Date().toISOString()
+    };
+
+    setDonationRecords(prev => [newRecord, ...prev]);
+    saveDocToFirestore('donations', newRecord.id, newRecord);
+
+    if (donationData.campaignId) {
+      setDonationCampaigns(prev => {
+        const next = prev.map(c => {
+          if (c.id === donationData.campaignId) {
+            const updatedCamp = {
+              ...c,
+              currentAmount: (c.currentAmount || 0) + donationData.amount,
+              donorsCount: (c.donorsCount || 0) + 1
+            };
+            saveDocToFirestore('donationCampaigns', c.id, updatedCamp);
+            return updatedCamp;
+          }
+          return c;
+        });
+        return next;
+      });
+    }
+
+    const ledgerEntry: FinancialTransaction = {
+      id: `tx-don-${Date.now()}`,
+      transactionId: newRecord.transactionRef,
+      type: 'CREDIT',
+      category: 'Donations',
+      amount: donationData.amount,
+      description: `80G Tax-Exempt Contribution towards ${donationData.campaignTitle || 'General Welfare Corpus'}`,
+      date: new Date().toISOString().split('T')[0],
+      visibility: 'public',
+      auditedBy: 'CA Devendra Saini (Statutory Auditor)',
+      payeeOrDonor: donationData.isAnonymous ? 'Anonymous Well-Wisher' : `${donationData.donorName}${donationData.donorPan ? ` (PAN: ${donationData.donorPan})` : ''}`
+    };
+    setLedgerTransactions(prev => [ledgerEntry, ...prev]);
+    saveDocToFirestore('financialTransactions', ledgerEntry.id, ledgerEntry);
+
+    setLastGeneratedReceipt(newRecord);
+    setIsDonationModalOpen(true);
+    return newRecord;
+  };
+
+  const verifyDonationRecord = (donationId: string, verifiedBy: string) => {
+    const verifiedAt = new Date().toISOString();
+    setDonationRecords(prev =>
+      prev.map(d =>
+        d.id === donationId
+          ? {
+              ...d,
+              paymentStatus: 'VERIFIED',
+              verifiedBy,
+              verifiedAt
+            }
+          : d
+      )
+    );
+    updateDocInFirestore('donations', donationId, {
+      paymentStatus: 'VERIFIED',
+      verifiedBy,
+      verifiedAt
+    });
+  };
+
+  const rejectDonationRecord = (donationId: string, reason: string) => {
+    setDonationRecords(prev =>
+      prev.map(d =>
+        d.id === donationId
+          ? {
+              ...d,
+              paymentStatus: 'REJECTED',
+              rejectionReason: reason
+            }
+          : d
+      )
+    );
+    updateDocInFirestore('donations', donationId, {
+      paymentStatus: 'REJECTED',
+      rejectionReason: reason
+    });
+  };
+
+  const deleteDonationRecord = (donationId: string) => {
+    setDonationRecords(prev => prev.filter(d => d.id !== donationId));
+    deleteDocFromFirestore('donations', donationId);
+  };
+
+  // Blood Donation Lifeline with Firestore
+  const addBloodDonor = (donor: Omit<BloodDonor, 'id' | 'createdAt' | 'isVerified'>) => {
+    const newDonor: BloodDonor = {
+      ...donor,
+      id: `donor-${Date.now()}`,
+      isVerified: true,
+      createdAt: new Date().toISOString()
+    };
+    setBloodDonors(prev => [newDonor, ...prev]);
+    saveDocToFirestore('blood_donors', newDonor.id, newDonor);
+  };
+
+  const updateBloodDonor = (id: string, updates: Partial<BloodDonor>) => {
+    setBloodDonors(prev => {
+      const next = prev.map(d => (d.id === id ? { ...d, ...updates } : d));
+      const target = next.find(d => d.id === id);
+      if (target) {
+        saveDocToFirestore('blood_donors', id, target);
+      }
+      return next;
+    });
+  };
+
+  const deleteBloodDonor = (id: string) => {
+    setBloodDonors(prev => prev.filter(d => d.id !== id));
+    deleteDocFromFirestore('blood_donors', id);
+  };
+
+  const toggleBloodDonorAvailability = (id: string) => {
+    setBloodDonors(prev => {
+      const next = prev.map(d => (d.id === id ? { ...d, isAvailable: !d.isAvailable } : d));
+      const target = next.find(d => d.id === id);
+      if (target) {
+        updateDocInFirestore('blood_donors', id, { isAvailable: target.isAvailable });
+      }
+      return next;
+    });
+  };
+
+  const submitBloodRequest = (req: Omit<BloodRequest, 'id' | 'createdAt' | 'status' | 'verifiedByNavodaya'>) => {
+    const newReq: BloodRequest = {
+      ...req,
+      id: `req-${Date.now()}`,
+      status: 'OPEN',
+      verifiedByNavodaya: true,
+      createdAt: new Date().toISOString()
+    };
+    setBloodRequests(prev => [newReq, ...prev]);
+    saveDocToFirestore('blood_requests', newReq.id, newReq);
+  };
+
+  const updateBloodRequestStatus = (id: string, status: BloodRequest['status']) => {
+    setBloodRequests(prev => {
+      const next = prev.map(r => (r.id === id ? { ...r, status } : r));
+      updateDocInFirestore('blood_requests', id, { status });
+      return next;
+    });
+  };
+
+  const deleteBloodRequest = (id: string) => {
+    setBloodRequests(prev => prev.filter(r => r.id !== id));
+    deleteDocFromFirestore('blood_requests', id);
+  };
+
+  // Memories with Firestore
   const addMemory = (memData: Omit<AlumniMemory, 'id' | 'createdAt' | 'likesCount' | 'isApproved'>) => {
     const newMem: AlumniMemory = {
       ...memData,
@@ -775,37 +1224,44 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString()
     };
     setMemories(prev => [newMem, ...prev]);
+    saveDocToFirestore('memories', newMem.id, newMem);
   };
 
   const approveMemory = (id: string) => {
     setMemories(prev => prev.map(m => (m.id === id ? { ...m, isApproved: true } : m)));
+    updateDocInFirestore('memories', id, { isApproved: true });
   };
 
   const rejectMemory = (id: string) => {
     setMemories(prev => prev.map(m => (m.id === id ? { ...m, isApproved: false } : m)));
+    updateDocInFirestore('memories', id, { isApproved: false });
   };
 
   const deleteMemory = (id: string) => {
     setMemories(prev => prev.filter(m => m.id !== id));
+    deleteDocFromFirestore('memories', id);
   };
 
   const likeMemory = (memoryId: string) => {
-    setMemories(prev =>
-      prev.map(m => {
+    setMemories(prev => {
+      const next = prev.map(m => {
         if (m.id === memoryId) {
           const isLiked = m.liked;
+          const nextLikes = isLiked ? Math.max(0, m.likesCount - 1) : m.likesCount + 1;
+          updateDocInFirestore('memories', memoryId, { likesCount: nextLikes });
           return {
             ...m,
             liked: !isLiked,
-            likesCount: isLiked ? m.likesCount - 1 : m.likesCount + 1
+            likesCount: nextLikes
           };
         }
         return m;
-      })
-    );
+      });
+      return next;
+    });
   };
 
-  // Achievements & Hall of Fame
+  // Achievements with Firestore
   const addAchievement = (ach: Omit<Achievement, 'id' | 'createdAt'>) => {
     const newAch: Achievement = {
       ...ach,
@@ -813,25 +1269,36 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString()
     };
     setAchievements(prev => [newAch, ...prev]);
+    saveDocToFirestore('achievements', newAch.id, newAch);
   };
 
   const updateAchievement = (id: string, updates: Partial<Achievement>) => {
-    setAchievements(prev => prev.map(a => (a.id === id ? { ...a, ...updates } : a)));
+    setAchievements(prev => {
+      const next = prev.map(a => (a.id === id ? { ...a, ...updates } : a));
+      const target = next.find(a => a.id === id);
+      if (target) {
+        saveDocToFirestore('achievements', id, target);
+      }
+      return next;
+    });
   };
 
   const approveAchievement = (id: string) => {
     setAchievements(prev => prev.map(a => (a.id === id ? { ...a, isApproved: true } : a)));
+    updateDocInFirestore('achievements', id, { isApproved: true });
   };
 
   const rejectAchievement = (id: string) => {
     setAchievements(prev => prev.map(a => (a.id === id ? { ...a, isApproved: false } : a)));
+    updateDocInFirestore('achievements', id, { isApproved: false });
   };
 
   const deleteAchievement = (id: string) => {
     setAchievements(prev => prev.filter(a => a.id !== id));
+    deleteDocFromFirestore('achievements', id);
   };
 
-  // Events & RSVP System
+  // Events & RSVP System with Firestore
   const addEvent = (eventData: Omit<AlumniEvent, 'id' | 'registeredCount'>) => {
     const newEvt: AlumniEvent = {
       ...eventData,
@@ -840,14 +1307,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       status: 'Upcoming'
     };
     setEvents(prev => [newEvt, ...prev]);
+    saveDocToFirestore('events', newEvt.id, newEvt);
   };
 
   const updateEvent = (id: string, updates: Partial<AlumniEvent>) => {
-    setEvents(prev => prev.map(e => (e.id === id ? { ...e, ...updates } : e)));
+    setEvents(prev => {
+      const next = prev.map(e => (e.id === id ? { ...e, ...updates } : e));
+      const target = next.find(e => e.id === id);
+      if (target) {
+        saveDocToFirestore('events', id, target);
+      }
+      return next;
+    });
   };
 
   const deleteEvent = (id: string) => {
     setEvents(prev => prev.filter(e => e.id !== id));
+    deleteDocFromFirestore('events', id);
   };
 
   const submitRSVP = (rsvpData: Omit<EventRSVP, 'id' | 'createdAt'>): { success: boolean; message: string } => {
@@ -869,6 +1345,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         notes: rsvpData.notes
       };
       setEventRsvps(updated);
+      saveDocToFirestore('event_rsvps', updated[existingIndex].id, updated[existingIndex]);
       return { success: true, message: `Your RSVP has been updated to "${rsvpData.status}".` };
     }
 
@@ -878,11 +1355,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString()
     };
     setEventRsvps(prev => [newRsvp, ...prev]);
+    saveDocToFirestore('event_rsvps', newRsvp.id, newRsvp);
 
     if (rsvpData.status === 'Going') {
-      setEvents(prev =>
-        prev.map(e => (e.id === rsvpData.eventId ? { ...e, registeredCount: (e.registeredCount || 0) + 1 } : e))
-      );
+      setEvents(prev => {
+        const next = prev.map(e => {
+          if (e.id === rsvpData.eventId) {
+            const updatedEvt = { ...e, registeredCount: (e.registeredCount || 0) + 1 };
+            saveDocToFirestore('events', e.id, updatedEvt);
+            return updatedEvt;
+          }
+          return e;
+        });
+        return next;
+      });
     }
 
     return { success: true, message: 'RSVP confirmed successfully!' };
@@ -891,15 +1377,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const cancelRSVP = (rsvpId: string) => {
     const target = eventRsvps.find(r => r.id === rsvpId);
     if (target && target.status === 'Going') {
-      setEvents(prev =>
-        prev.map(e => (e.id === target.eventId ? { ...e, registeredCount: Math.max(0, (e.registeredCount || 1) - 1) } : e))
-      );
+      setEvents(prev => {
+        const next = prev.map(e => {
+          if (e.id === target.eventId) {
+            const updatedEvt = { ...e, registeredCount: Math.max(0, (e.registeredCount || 1) - 1) };
+            saveDocToFirestore('events', e.id, updatedEvt);
+            return updatedEvt;
+          }
+          return e;
+        });
+        return next;
+      });
     }
     setEventRsvps(prev => prev.filter(r => r.id !== rsvpId));
+    deleteDocFromFirestore('event_rsvps', rsvpId);
   };
 
   const deleteEventRSVP = (id: string) => {
     setEventRsvps(prev => prev.filter(r => r.id !== id));
+    deleteDocFromFirestore('event_rsvps', id);
   };
 
   const getUserRSVP = (eventId: string, userIdOrEmail: string): EventRSVP | undefined => {
@@ -909,12 +1405,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   };
 
-  // Elections, Nominations & E-Ballot
+  // Elections, Nominations & E-Ballot with Firestore
   const createOrUpdateElection = (electionData: Partial<Election>) => {
-    setElection(prev => ({
-      ...prev,
-      ...electionData
-    }));
+    setElection(prev => {
+      const next = { ...prev, ...electionData };
+      saveDocToFirestore('elections', 'current', next);
+      return next;
+    });
 
     const newLog: ElectionAuditLog = {
       id: `aud-${Date.now()}`,
@@ -926,6 +1423,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       timestamp: new Date().toISOString()
     };
     setAuditLogs(prev => [newLog, ...prev]);
+    saveDocToFirestore('auditLogs', newLog.id, newLog);
   };
 
   const submitNomination = (nomData: Omit<ElectionNomination, 'id' | 'submittedAt' | 'status'>): { success: boolean; message: string } => {
@@ -950,6 +1448,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     setNominations(prev => [newNom, ...prev]);
+    saveDocToFirestore('nominations', newNom.id, newNom);
 
     const audit: ElectionAuditLog = {
       id: `aud-${Date.now()}`,
@@ -961,6 +1460,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       timestamp: new Date().toISOString()
     };
     setAuditLogs(prev => [audit, ...prev]);
+    saveDocToFirestore('auditLogs', audit.id, audit);
 
     return { success: true, message: 'Your self-nomination has been submitted for Election Officer review.' };
   };
@@ -969,18 +1469,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const nom = nominations.find(n => n.id === nominationId);
     if (!nom) return;
 
-    setNominations(prev =>
-      prev.map(n =>
+    setNominations(prev => {
+      const next = prev.map(n =>
         n.id === nominationId
           ? {
               ...n,
-              status: 'APPROVED',
+              status: 'APPROVED' as const,
               reviewedBy: user?.displayName || 'Election Officer',
               reviewedAt: new Date().toISOString()
             }
           : n
-      )
-    );
+      );
+      const target = next.find(n => n.id === nominationId);
+      if (target) {
+        saveDocToFirestore('nominations', nominationId, target);
+      }
+      return next;
+    });
 
     setElection(prev => {
       const updatedPositions = prev.positions.map(pos => {
@@ -1001,7 +1506,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 manifesto: nom.manifesto,
                 avatar: nom.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop',
                 votes: 0,
-                status: 'APPROVED'
+                status: 'APPROVED' as const
               }
             ]
           };
@@ -1009,10 +1514,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return pos;
       });
 
-      return {
+      const nextElection = {
         ...prev,
         positions: updatedPositions
       };
+      saveDocToFirestore('elections', 'current', nextElection);
+      return nextElection;
     });
 
     const audit: ElectionAuditLog = {
@@ -1025,25 +1532,31 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       timestamp: new Date().toISOString()
     };
     setAuditLogs(prev => [audit, ...prev]);
+    saveDocToFirestore('auditLogs', audit.id, audit);
   };
 
   const rejectNomination = (nominationId: string, reason?: string) => {
     const nom = nominations.find(n => n.id === nominationId);
     if (!nom) return;
 
-    setNominations(prev =>
-      prev.map(n =>
+    setNominations(prev => {
+      const next = prev.map(n =>
         n.id === nominationId
           ? {
               ...n,
-              status: 'REJECTED',
+              status: 'REJECTED' as const,
               adminNote: reason || 'Does not meet the eligibility criterion.',
               reviewedBy: user?.displayName || 'Election Officer',
               reviewedAt: new Date().toISOString()
             }
           : n
-      )
-    );
+      );
+      const target = next.find(n => n.id === nominationId);
+      if (target) {
+        saveDocToFirestore('nominations', nominationId, target);
+      }
+      return next;
+    });
 
     const audit: ElectionAuditLog = {
       id: `aud-${Date.now()}`,
@@ -1055,10 +1568,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       timestamp: new Date().toISOString()
     };
     setAuditLogs(prev => [audit, ...prev]);
+    saveDocToFirestore('auditLogs', audit.id, audit);
   };
 
   const deleteNomination = (nominationId: string) => {
     setNominations(prev => prev.filter(n => n.id !== nominationId));
+    deleteDocFromFirestore('nominations', nominationId);
   };
 
   const hasUserVotedForPosition = (positionId: string): boolean => {
@@ -1092,13 +1607,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     setVotes(prev => [...prev, newVote]);
+    saveDocToFirestore('votes', newVote.id, newVote);
 
     setElection(prev => {
       const updatedPositions = prev.positions.map(pos => {
         if (pos.id === positionId) {
           const updatedCandidates = pos.candidates.map(cand => {
             if (cand.id === candidateId) {
-              return { ...cand, votes: cand.votes + 1 };
+              return { ...cand, votes: (cand.votes || 0) + 1 };
             }
             return cand;
           });
@@ -1107,11 +1623,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return pos;
       });
 
-      return {
+      const nextElection = {
         ...prev,
-        totalVotesCast: prev.totalVotesCast + 1,
+        totalVotesCast: (prev.totalVotesCast || 0) + 1,
         positions: updatedPositions
       };
+      saveDocToFirestore('elections', 'current', nextElection);
+      return nextElection;
     });
 
     const audit: ElectionAuditLog = {
@@ -1124,25 +1642,35 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       timestamp: new Date().toISOString()
     };
     setAuditLogs(prev => [audit, ...prev]);
+    saveDocToFirestore('auditLogs', audit.id, audit);
 
     return { success: true, message: 'Your vote has been securely recorded on the electronic ballot!' };
   };
 
-  // Financial Transparency & Ledger
+  // Financial Transparency & Ledger with Firestore
   const addFinancialReport = (rep: Omit<FinancialReport, 'id'>) => {
     const newRep: FinancialReport = {
       ...rep,
       id: `rep-${Date.now()}`
     };
     setFinancialReports(prev => [newRep, ...prev]);
+    saveDocToFirestore('financial_reports', newRep.id, newRep);
   };
 
   const updateFinancialReport = (id: string, updates: Partial<FinancialReport>) => {
-    setFinancialReports(prev => prev.map(r => (r.id === id ? { ...r, ...updates } : r)));
+    setFinancialReports(prev => {
+      const next = prev.map(r => (r.id === id ? { ...r, ...updates } : r));
+      const target = next.find(r => r.id === id);
+      if (target) {
+        saveDocToFirestore('financial_reports', id, target);
+      }
+      return next;
+    });
   };
 
   const deleteFinancialReport = (id: string) => {
     setFinancialReports(prev => prev.filter(r => r.id !== id));
+    deleteDocFromFirestore('financial_reports', id);
   };
 
   const addLedgerTransaction = (tx: Omit<FinancialTransaction, 'id'>) => {
@@ -1151,112 +1679,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: `tx-${Date.now()}`
     };
     setLedgerTransactions(prev => [newTx, ...prev]);
+    saveDocToFirestore('financialTransactions', newTx.id, newTx);
   };
 
   const updateLedgerTransaction = (id: string, updates: Partial<FinancialTransaction>) => {
-    setLedgerTransactions(prev => prev.map(t => (t.id === id ? { ...t, ...updates } : t)));
+    setLedgerTransactions(prev => {
+      const next = prev.map(t => (t.id === id ? { ...t, ...updates } : t));
+      const target = next.find(t => t.id === id);
+      if (target) {
+        saveDocToFirestore('financialTransactions', id, target);
+      }
+      return next;
+    });
   };
 
   const deleteLedgerTransaction = (id: string) => {
     setLedgerTransactions(prev => prev.filter(t => t.id !== id));
+    deleteDocFromFirestore('financialTransactions', id);
   };
 
-  const recordDonation = (donationData: Omit<DonationRecord, 'id' | 'createdAt' | 'paymentStatus' | 'transactionRef' | 'receiptNumber' | 'taxExempt80GRegNo'>): DonationRecord => {
-    const currentYear = new Date().getFullYear();
-    const nextYearSuffix = (currentYear + 1).toString().slice(-2);
-    const randomSeq = Math.floor(1000 + Math.random() * 9000);
-    const txnCode = Math.floor(100000 + Math.random() * 900000);
-
-    const newRecord: DonationRecord = {
-      ...donationData,
-      id: `don-${Date.now()}`,
-      receiptNumber: `80G/JNVPAA/${currentYear}-${nextYearSuffix}/${randomSeq}`,
-      taxExempt80GRegNo: 'CIT(E)/JNVPAA/80G/2012-13/894',
-      transactionRef: `JNV80G-${txnCode}`,
-      paymentStatus: 'SUCCESS',
-      createdAt: new Date().toISOString()
-    };
-
-    setDonationRecords(prev => [newRecord, ...prev]);
-
-    if (donationData.campaignId) {
-      setDonationCampaigns(prev =>
-        prev.map(c =>
-          c.id === donationData.campaignId
-            ? {
-                ...c,
-                currentAmount: c.currentAmount + donationData.amount,
-                donorsCount: c.donorsCount + 1
-              }
-            : c
-        )
-      );
-    }
-
-    const ledgerEntry: FinancialTransaction = {
-      id: `tx-don-${Date.now()}`,
-      transactionId: newRecord.transactionRef,
-      type: 'CREDIT',
-      category: 'Donations',
-      amount: donationData.amount,
-      description: `80G Tax-Exempt Contribution towards ${donationData.campaignTitle || 'General Welfare Corpus'}`,
-      date: new Date().toISOString().split('T')[0],
-      visibility: 'public',
-      auditedBy: 'CA Devendra Saini (Statutory Auditor)',
-      payeeOrDonor: donationData.isAnonymous ? 'Anonymous Well-Wisher' : `${donationData.donorName}${donationData.donorPan ? ` (PAN: ${donationData.donorPan})` : ''}`
-    };
-    setLedgerTransactions(prev => [ledgerEntry, ...prev]);
-
-    setLastGeneratedReceipt(newRecord);
-    setIsDonationModalOpen(true);
-    return newRecord;
-  };
-
-  // Blood Donation Lifeline Methods
-  const addBloodDonor = (donor: Omit<BloodDonor, 'id' | 'createdAt' | 'isVerified'>) => {
-    const newDonor: BloodDonor = {
-      ...donor,
-      id: `donor-${Date.now()}`,
-      isVerified: true,
-      createdAt: new Date().toISOString()
-    };
-    setBloodDonors(prev => [newDonor, ...prev]);
-  };
-
-  const updateBloodDonor = (id: string, updates: Partial<BloodDonor>) => {
-    setBloodDonors(prev => prev.map(d => (d.id === id ? { ...d, ...updates } : d)));
-  };
-
-  const deleteBloodDonor = (id: string) => {
-    setBloodDonors(prev => prev.filter(d => d.id !== id));
-  };
-
-  const toggleBloodDonorAvailability = (id: string) => {
-    setBloodDonors(prev => prev.map(d => (d.id === id ? { ...d, isAvailable: !d.isAvailable } : d)));
-  };
-
-  const submitBloodRequest = (req: Omit<BloodRequest, 'id' | 'createdAt' | 'status' | 'verifiedByNavodaya'>) => {
-    const newReq: BloodRequest = {
-      ...req,
-      id: `req-${Date.now()}`,
-      status: 'OPEN',
-      verifiedByNavodaya: true,
-      createdAt: new Date().toISOString()
-    };
-    setBloodRequests(prev => [newReq, ...prev]);
-  };
-
-  const updateBloodRequestStatus = (id: string, status: BloodRequest['status']) => {
-    setBloodRequests(prev => prev.map(r => (r.id === id ? { ...r, status } : r)));
-  };
-
-  const deleteBloodRequest = (id: string) => {
-    setBloodRequests(prev => prev.filter(r => r.id !== id));
-  };
-
-  // Reset to default seed data
-  const resetToDefaultSeedData = () => {
+  // Reset to default seed data with complete Firestore re-population
+  const resetToDefaultSeedData = async () => {
     setSchoolSettings(SEED_SCHOOL_SETTINGS);
+    setPaymentSettings(SEED_PAYMENT_SETTINGS);
     setHouses(SEED_HOUSES as HouseInfo[]);
     setToppers(SEED_TOPPERS);
     setVmcMembers(SEED_VMC_MEMBERS);
@@ -1270,7 +1715,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setJobs(SEED_JOBS);
     setWelfareCases(SEED_WELFARE_CASES);
     setDonationCampaigns(SEED_DONATION_CAMPAIGNS);
-    setDonationRecords([]);
+    setDonationRecords(SEED_DONATIONS);
     setBloodDonors(SEED_BLOOD_DONORS);
     setBloodRequests(SEED_BLOOD_REQUESTS);
     setMemories(SEED_MEMORIES);
@@ -1283,91 +1728,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAuditLogs(SEED_AUDIT_LOGS);
     setFinancialReports(SEED_FINANCIAL_REPORTS);
     setLedgerTransactions(SEED_TRANSACTIONS);
+
+    // Save defaults to Firestore
+    try {
+      saveDocToFirestore('school_settings', 'current', SEED_SCHOOL_SETTINGS);
+      saveDocToFirestore('payment_settings', 'current', SEED_PAYMENT_SETTINGS);
+      saveDocToFirestore('elections', 'current', SEED_ELECTIONS);
+    } catch (e) {
+      console.warn('Reset notice:', e);
+    }
   };
 
-  // CSV Import & Export Suite
+  // CSV Template & Export Suite
   const getCSVTemplate = (moduleType: string): string => {
-    switch (moduleType) {
-      case 'alumni':
-        return `fullName,batchYear,email,phone,house,city,state,country,profession,company,designation,industry,bloodGroup,bio,isMentorAvailable,isBusinessOwner,isLookingForJobs,isHiring,verificationStatus
-"Ravi Sharma",2012,"ravi.sharma@example.com","+91 9876543210","Aravali","Jaipur","Rajasthan","India","Software Architect","Infosys","Lead Architect","IT & Software","B+","Senior technology leader mentoring JNV students.",true,false,false,true,"verified"
-"Dr. Sneha Rathore",2008,"sneha.rathore@medcare.org","+91 9823456789","Nilgiri","Jodhpur","Rajasthan","India","Cardiologist","AIIMS Jodhpur","Associate Professor","Healthcare","O+","Cardiology specialist offering medical guidance.",true,false,false,false,"verified"
-"Prakash Gehlot",2015,"prakash.gehlot@marwarinfra.in","+91 9845123456","Shivalik","Balotra","Rajasthan","India","Civil Engineer & Entrepreneur","Marwar Infra Ltd","Director","Construction & Infrastructure","A+","Dedicated to regional development and alumni projects.",false,true,false,true,"verified"`;
-
-      case 'faculty':
-        return `name,designation,department,qualification,experienceYears,email,phone
-"Dr. K.L. Sharma","PGT Physics","Physics","M.Sc. Physics, Ph.D., B.Ed.",16,"kl.physics@jnvpachpadra.edu.in","+91 9414123456"
-"Smt. Ananya Trivedi","PGT Biology","Biology","M.Sc. Zoology, B.Ed., CTET",12,"ananya.biology@jnvpachpadra.edu.in","+91 9414234567"
-"Shri R.K. Meena","TGT Mathematics","Mathematics","M.Sc. Mathematics, B.Ed.",8,"rk.maths@jnvpachpadra.edu.in","+91 9414345678"`;
-
-      case 'notices':
-        return `title,category,publishDate,targetAudience,content,isPinned,referenceNo
-"Alumni Grand Reunion & AGM 2026","Alumni","2026-09-15","All","Notice is hereby given for the Annual General Meeting and Grand Reunion celebration at school campus. All alumni are cordially invited.",true,"JNV/PACH/ALUM/2026/102"
-"JNVST Class VI Entrance Exam 2027 Admissions Open","Admissions","2026-08-20","Public","Navodaya Vidyalaya Samiti invites online applications for Jawahar Navodaya Vidyalaya Selection Test (JNVST) for Class VI admission.",true,"JNV/PACH/ADM/2026/45"
-"Inter-House Athletics & Sports Championship Fixtures","Sports","2026-10-05","Students","Annual Inter-House Sports Championship scheduled from Oct 10 to 14. House captains to finalize team rosters by Oct 7.",false,"JNV/PACH/SPT/2026/18"`;
-
-      case 'events':
-        return `title,category,date,time,location,isOnline,isAlumniEvent,maxCapacity,description
-"Silver Jubilee Batch Reunion (1998-2005)","Reunion","2026-12-25","10:00 AM IST","JNV Campus Auditorium",false,true,300,"Milestone silver jubilee batch reunion with school tour, cultural nostalgia and felicitations."
-"Career Mentorship & Guidance Summit 2026","Career","2026-11-14","02:00 PM IST","Google Meet Virtual Hall",true,true,500,"Distinguished alumni panel interactive mentoring session for Class 10th to 12th students."
-"Navodaya Sports Meet & Marathon 2026","Sports","2026-11-28","07:00 AM IST","Balotra Stadium",false,true,250,"Community marathon and alumni vs school students cricket and football tournament."`;
-
-      case 'ledger':
-        return `transactionId,type,category,amount,description,date,visibility,auditedBy,payeeOrDonor
-"TXN-2026-0810","CREDIT","Donations",150000,"Smart Science Lab Equipment Grant","2026-08-10","public","CA R.K. Saini (FCA #087412)","Batch 2010 Alumni Trust"
-"TXN-2026-0815","DEBIT","Student Welfare",45000,"Merit Scholarship Disbursements for 10 Students","2026-08-15","public","CA R.K. Saini (FCA #087412)","JNV Principal Office"
-"TXN-2026-0820","CREDIT","Membership Fee",85000,"Annual PAA Lifetime Membership Collections","2026-08-20","public","CA R.K. Saini (FCA #087412)","General Alumni"`;
-
-      case 'financial_reports':
-        return `title,financialYear,category,reportSummary,visibility,auditorName,amountAudited
-"Statutory Annual Audit Report FY 2025-26","2025-2026","Annual Audit Report","Comprehensive statutory audited statement of alumni association fund operations with zero non-compliances.","public","CA R.K. Saini (FCA #087412)",4850000
-"Mid-Term Balance Sheet & Fund Utilization Q2","2025-2026","Balance Sheet","Half-yearly reviewed summary of receipts, bank balances, and welfare project disbursements.","public","Internal Audit Board",2400000`;
-
-      case 'toppers':
-        return `name,exam,stream,percentage,year,currentPursuit,photoUrl
-"Priya Choudhary","CBSE Class XII","Science (PCM + CS)",98.4,2025,"B.Tech CSE at IIT Delhi","https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop"
-"Rahul Soni","CBSE Class XII","Science (PCB + Biotech)",97.8,2025,"MBBS at AIIMS Jodhpur","https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&h=400&fit=crop"
-"Vikas Patel","CBSE Class X AISSE","All Subjects",99.0,2025,"Class XI Science at JNV Pachpadra","https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop"`;
-
-      case 'blood_donors':
-        return `fullName,bloodGroup,city,state,phone,email,batchYear,lastDonatedDate,isAvailable,hospitalOrArea
-"Amit Kumar","O+","Balotra","Rajasthan","+91 9414556677","amit.k@gmail.com",2014,"2026-05-10",true,"Balotra Civil Hospital"
-"Deepak Jain","B+","Jodhpur","Rajasthan","+91 9414667788","deepak.j@gmail.com",2011,"2026-06-15",true,"AIIMS & MDM Hospital Jodhpur"
-"Sunita Verma","AB+","Jaipur","Rajasthan","+91 9414778899","sunita.v@gmail.com",2016,"2026-04-20",true,"SMS Medical College Hospital Jaipur"`;
-
-      case 'vmc_members':
-        return `name,designation,organization,phone,email
-"District Magistrate / Collector","Chairman VMC","Dist. Administration Balotra / Barmer","+91 2982 220001","dm-balotra@rajasthan.gov.in"
-"Principal JNV Pachpadra","Member Secretary","JNV Pachpadra","+91 2988 222111","principal-jnvpachpadra@gov.in"
-"Executive Engineer PWD","Member (Civil Works)","Public Works Department","+91 2988 222333","ee-pwd-balotra@rajasthan.gov.in"
-"Chief Medical & Health Officer (CMHO)","Member (Health)","Medical & Health Services","+91 2988 222444","cmho-balotra@rajasthan.gov.in"`;
-
-      case 'donation_campaigns':
-        return `title,category,targetAmount,currentAmount,donorCount,status,endDate,description
-"Digital Science Lab Modernization 2026","Infrastructure",500000,320000,45,"Active","2026-12-31","Equipping campus science labs with interactive digital screens, IoT robotics kits, and apparatus."
-"Underprivileged Student Merit Scholarship 2026","Scholarship",300000,210000,28,"Active","2026-10-31","Providing higher education stipends and books for financially vulnerable meritorious graduates."
-"Campus Solar Green Power Initiative","Campus Upgrades",450000,180000,34,"Active","2026-11-30","Installing 25kW rooftop solar panels for round-the-clock clean electricity in school hostels."`;
-
-      case 'jobs':
-        return `title,company,location,employmentType,experience,salaryRange,description,applyLinkOrEmail,postedByName,postedByBatch,postedByEmail
-"Senior Full Stack Developer","TechVeda Labs","Remote / Bangalore","Full-Time","3-5 Years","18 - 25 LPA","Looking for React + Node.js engineer with microservices expertise.","careers@techvedalabs.com","Harish Sharma",2013,"harish@techvedalabs.com"
-"Civil Site Engineer","Marwar Infra Ltd","Balotra / Barmer","Full-Time","2+ Years","6 - 9 LPA","Supervision of commercial and institutional construction projects.","apply@marwarinfra.in","Ramesh Patel",2010,"ramesh@marwarinfra.in"
-"Marketing & Growth Specialist","EdTech Innovators","Jaipur / Hybrid","Full-Time","1-3 Years","5 - 8 LPA","B2B sales and academic institutional relationship management.","jobs@edtech.in","Kavita Bishnoi",2017,"kavita@edtech.in"`;
-
-      case 'businesses':
-        return `name,category,ownerName,ownerBatch,ownerEmail,ownerPhone,website,description,isVerified,city,discountForAlumni
-"Marwar Solar & Green Energy","Renewable Energy","Suresh Gehlot",2009,"suresh@marwarsolar.in","+91 9829012345","https://marwarsolar.in","Rooftop solar installation & maintenance services.",true,"Balotra","10% discount on residential solar systems"
-"Desert Oasis Organic Farms","Agriculture & Food","Manish Bishnoi",2012,"manish@desertoasis.in","+91 9829023456","https://desertoasis.in","Pure A2 Desi cow ghee, organic bajra & indigenous spices.",true,"Barmer","15% off for verified JNV Alumni"
-"Balotra Diagnostics & PathLab","Healthcare","Dr. Pooja Sharma",2011,"pooja@balotradiagnostics.com","+91 9829034567","https://balotradiagnostics.com","NABL accredited automated pathology and radiology center.",true,"Balotra","20% concession on comprehensive health packages"`;
-
-      default:
-        return 'id,title,description\n"1","Sample Title","Sample Description"';
-    }
+    return CSV_TEMPLATES[moduleType] || 'id,title,description\n"1","Sample Title","Sample Description"';
   };
 
   const exportToCSV = (moduleType: string, customRows?: any[]) => {
     let rows: any[] = [];
-    let filename = `${moduleType}_export_${new Date().toISOString().split('T')[0]}.csv`;
+    const filename = `${moduleType}_export_${new Date().toISOString().split('T')[0]}.csv`;
 
     if (customRows && customRows.length > 0) {
       rows = customRows;
@@ -1406,131 +1785,97 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         case 'donation_campaigns':
           rows = donationCampaigns;
           break;
+        case 'donations':
+          rows = donationRecords;
+          break;
         case 'jobs':
           rows = jobs;
           break;
         case 'businesses':
           rows = businesses;
           break;
-        case 'elections':
-          rows = election.positions.flatMap(p => p.candidates.map(c => ({ position: p.title, candidateName: c.name, batch: c.batch, votes: c.votes })));
-          break;
-        case 'inquiries':
-          rows = admissionEnquiries;
-          break;
         default:
-          rows = [];
+          rows = alumni;
       }
     }
 
-    if (rows.length === 0) {
-      alert(`No records found to export for ${moduleType}.`);
-      return;
-    }
-
-    const headers = Object.keys(rows[0]).filter(k => typeof rows[0][k] !== 'object');
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row =>
-        headers
-          .map(header => {
-            const val = row[header] !== undefined && row[header] !== null ? String(row[header]) : '';
-            return `"${val.replace(/"/g, '""')}"`;
-          })
-          .join(',')
-      )
-    ].join('\n');
-
+    const csvContent = formatAsCSV(rows);
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
     link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const parseCSVLine = (text: string): string[] => {
-    const result: string[] = [];
-    let cur = '';
-    let inQuotes = false;
-    for (let i = 0; i < text.length; i++) {
-      const c = text[i];
-      if (c === '"') {
-        if (inQuotes && text[i + 1] === '"') {
-          cur += '"';
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (c === ',' && !inQuotes) {
-        result.push(cur.trim());
-        cur = '';
-      } else {
-        cur += c;
-      }
-    }
-    result.push(cur.trim());
-    return result;
-  };
-
-  const importFromCSV = (moduleType: string, csvContent: string, updateExisting: boolean = true): CSVImportResult => {
-    const lines = csvContent.trim().split(/\r?\n/).filter(l => l.trim().length > 0);
-    if (lines.length < 2) {
-      return { success: false, importedCount: 0, updatedCount: 0, duplicateCount: 0, totalProcessed: 0, errors: ['CSV file is empty or missing data rows.'], message: 'File has no content.' };
+  const importFromCSV = async (moduleType: string, csvContent: string, updateExisting: boolean = true): Promise<CSVImportResult> => {
+    const rawLines = parseCSVLines(csvContent);
+    if (rawLines.length < 2) {
+      return {
+        success: false,
+        importedCount: 0,
+        updatedCount: 0,
+        duplicateCount: 0,
+        totalProcessed: 0,
+        errors: ['CSV file is empty or contains only a header line.'],
+        message: 'No valid data rows found to import.'
+      };
     }
 
-    const headers = parseCSVLine(lines[0]).map(h => h.replace(/^["']|["']$/g, '').trim());
-    const dataLines = lines.slice(1);
+    const headers = rawLines[0].map(h => h.trim().replace(/^"/, '').replace(/"$/, ''));
+    const dataLines = rawLines.slice(1);
+
     let imported = 0;
     let updated = 0;
     let duplicates = 0;
     const errors: string[] = [];
 
-    dataLines.forEach((line, idx) => {
+    dataLines.forEach((row, idx) => {
       const rowIdx = idx + 2;
-      const values = parseCSVLine(line);
-      const rowObj: any = {};
-      headers.forEach((h, i) => {
-        rowObj[h] = values[i] !== undefined ? values[i] : '';
+      const rowObj: Record<string, any> = {};
+      headers.forEach((h, colIdx) => {
+        rowObj[h] = row[colIdx] !== undefined ? row[colIdx] : '';
       });
 
       try {
         if (moduleType === 'alumni') {
           if (!rowObj.fullName || !rowObj.email) {
-            errors.push(`Row ${rowIdx}: Missing required fullName or email.`);
+            errors.push(`Row ${rowIdx}: Missing required Name or Email.`);
             return;
           }
-          const rowEmail = (rowObj.email || '').toLowerCase().trim();
-          const existingIndex = alumni.findIndex(a => (a.email || '').toLowerCase().trim() === rowEmail);
+          const email = (rowObj.email || '').toLowerCase().trim();
+          const existingIndex = alumni.findIndex(a => (a.email || '').toLowerCase().trim() === email);
 
           if (existingIndex >= 0) {
             if (updateExisting) {
               setAlumni(prev => {
                 const next = [...prev];
-                const target = next[existingIndex];
-                next[existingIndex] = {
-                  ...target,
-                  fullName: rowObj.fullName || target.fullName,
-                  batchYear: rowObj.batchYear ? Number(rowObj.batchYear) : target.batchYear,
-                  phone: rowObj.phone !== undefined && rowObj.phone !== '' ? rowObj.phone : target.phone,
-                  house: (rowObj.house as any) || target.house,
-                  city: rowObj.city || target.city,
-                  state: rowObj.state || target.state,
-                  country: rowObj.country || target.country,
-                  profession: rowObj.profession || target.profession,
-                  company: rowObj.company !== undefined && rowObj.company !== '' ? rowObj.company : target.company,
-                  designation: rowObj.designation !== undefined && rowObj.designation !== '' ? rowObj.designation : target.designation,
-                  industry: rowObj.industry || target.industry,
-                  bloodGroup: rowObj.bloodGroup || target.bloodGroup,
-                  bio: rowObj.bio || target.bio,
-                  isMentorAvailable: rowObj.isMentorAvailable !== undefined ? (rowObj.isMentorAvailable === 'true' || rowObj.isMentorAvailable === true) : target.isMentorAvailable,
-                  isBusinessOwner: rowObj.isBusinessOwner !== undefined ? (rowObj.isBusinessOwner === 'true' || rowObj.isBusinessOwner === true) : target.isBusinessOwner,
-                  isLookingForJobs: rowObj.isLookingForJobs !== undefined ? (rowObj.isLookingForJobs === 'true' || rowObj.isLookingForJobs === true) : target.isLookingForJobs,
-                  isHiring: rowObj.isHiring !== undefined ? (rowObj.isHiring === 'true' || rowObj.isHiring === true) : target.isHiring,
-                  verificationStatus: (rowObj.verificationStatus as any) || target.verificationStatus
+                const updatedAlum = {
+                  ...next[existingIndex],
+                  fullName: rowObj.fullName || next[existingIndex].fullName,
+                  batchYear: rowObj.batchYear ? Number(rowObj.batchYear) : next[existingIndex].batchYear,
+                  phone: rowObj.phone || next[existingIndex].phone,
+                  house: (rowObj.house as any) || next[existingIndex].house,
+                  city: rowObj.city || next[existingIndex].city,
+                  state: rowObj.state || next[existingIndex].state,
+                  country: rowObj.country || next[existingIndex].country,
+                  profession: rowObj.profession || next[existingIndex].profession,
+                  company: rowObj.company || next[existingIndex].company,
+                  designation: rowObj.designation || next[existingIndex].designation,
+                  industry: rowObj.industry || next[existingIndex].industry,
+                  bloodGroup: (rowObj.bloodGroup as any) || next[existingIndex].bloodGroup,
+                  bio: rowObj.bio || next[existingIndex].bio,
+                  isMentorAvailable: rowObj.isMentorAvailable !== undefined ? (rowObj.isMentorAvailable === 'true' || rowObj.isMentorAvailable === true) : next[existingIndex].isMentorAvailable,
+                  isBusinessOwner: rowObj.isBusinessOwner !== undefined ? (rowObj.isBusinessOwner === 'true' || rowObj.isBusinessOwner === true) : next[existingIndex].isBusinessOwner,
+                  isLookingForJobs: rowObj.isLookingForJobs !== undefined ? (rowObj.isLookingForJobs === 'true' || rowObj.isLookingForJobs === true) : next[existingIndex].isLookingForJobs,
+                  isHiring: rowObj.isHiring !== undefined ? (rowObj.isHiring === 'true' || rowObj.isHiring === true) : next[existingIndex].isHiring,
+                  verificationStatus: (rowObj.verificationStatus as any) || next[existingIndex].verificationStatus
                 };
+                next[existingIndex] = updatedAlum;
+                saveDocToFirestore('alumniProfiles', updatedAlum.id, updatedAlum);
                 return next;
               });
               updated++;
@@ -1541,20 +1886,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const newAlum: AlumniProfile = {
               id: `alum-imp-${Date.now()}-${idx}`,
               fullName: rowObj.fullName,
-              email: rowObj.email.trim(),
               batchYear: Number(rowObj.batchYear) || 2015,
+              email: rowObj.email,
               phone: rowObj.phone || '',
               house: (rowObj.house as any) || 'Aravali',
-              city: rowObj.city || 'Barmer',
+              city: rowObj.city || 'Balotra',
               state: rowObj.state || 'Rajasthan',
               country: rowObj.country || 'India',
-              profession: rowObj.profession || 'Professional',
+              profession: rowObj.profession || 'Alumnus',
               company: rowObj.company || '',
               designation: rowObj.designation || '',
-              industry: rowObj.industry || 'Services',
-              bloodGroup: rowObj.bloodGroup || '',
-              bio: rowObj.bio || 'JNV Pachpadra Alumnus',
-              avatar: rowObj.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop',
+              industry: rowObj.industry || 'General',
+              bloodGroup: (rowObj.bloodGroup as any) || 'B+',
+              bio: rowObj.bio || 'Proud Navodayan graduate of JNV Pachpadra.',
+              avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop',
               isMentorAvailable: rowObj.isMentorAvailable === 'true' || rowObj.isMentorAvailable === true,
               isBusinessOwner: rowObj.isBusinessOwner === 'true' || rowObj.isBusinessOwner === true,
               isLookingForJobs: rowObj.isLookingForJobs === 'true' || rowObj.isLookingForJobs === true,
@@ -1563,52 +1908,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
               createdAt: new Date().toISOString()
             };
             setAlumni(prev => [newAlum, ...prev]);
-            imported++;
-          }
-        } else if (moduleType === 'faculty') {
-          if (!rowObj.name || !rowObj.department) {
-            errors.push(`Row ${rowIdx}: Missing faculty name or department.`);
-            return;
-          }
-          const facName = (rowObj.name || '').toLowerCase().trim();
-          const facEmail = (rowObj.email || '').toLowerCase().trim();
-          const existingIndex = faculty.findIndex(f => 
-            (facEmail && (f.email || '').toLowerCase().trim() === facEmail) ||
-            (f.name || '').toLowerCase().trim() === facName
-          );
-
-          if (existingIndex >= 0) {
-            if (updateExisting) {
-              setFaculty(prev => {
-                const next = [...prev];
-                next[existingIndex] = {
-                  ...next[existingIndex],
-                  designation: rowObj.designation || next[existingIndex].designation,
-                  department: (rowObj.department as any) || next[existingIndex].department,
-                  qualification: rowObj.qualification || next[existingIndex].qualification,
-                  experienceYears: rowObj.experienceYears ? Number(rowObj.experienceYears) : next[existingIndex].experienceYears,
-                  email: rowObj.email || next[existingIndex].email,
-                  phone: rowObj.phone || next[existingIndex].phone
-                };
-                return next;
-              });
-              updated++;
-            } else {
-              duplicates++;
-            }
-          } else {
-            const newFac: FacultyMember = {
-              id: `fac-imp-${Date.now()}-${idx}`,
-              name: rowObj.name,
-              designation: rowObj.designation || 'Teacher',
-              department: (rowObj.department as any) || 'Physics',
-              qualification: rowObj.qualification || 'M.Sc., B.Ed.',
-              experienceYears: Number(rowObj.experienceYears) || 5,
-              photoUrl: rowObj.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&h=300&fit=crop',
-              email: rowObj.email || '',
-              phone: rowObj.phone || ''
-            };
-            setFaculty(prev => [...prev, newFac]);
+            saveDocToFirestore('alumniProfiles', newAlum.id, newAlum);
             imported++;
           }
         } else if (moduleType === 'notices') {
@@ -1616,469 +1916,163 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             errors.push(`Row ${rowIdx}: Missing notice title or content.`);
             return;
           }
-          const refNo = (rowObj.referenceNo || '').toLowerCase().trim();
-          const title = (rowObj.title || '').toLowerCase().trim();
-          const existingIndex = notices.findIndex(n => 
-            (refNo && (n.referenceNo || '').toLowerCase().trim() === refNo) ||
-            (n.title || '').toLowerCase().trim() === title
-          );
-
-          if (existingIndex >= 0) {
-            if (updateExisting) {
-              setNotices(prev => {
-                const next = [...prev];
-                next[existingIndex] = {
-                  ...next[existingIndex],
-                  category: (rowObj.category as any) || next[existingIndex].category,
-                  publishDate: rowObj.publishDate || next[existingIndex].publishDate,
-                  targetAudience: (rowObj.targetAudience as any) || next[existingIndex].targetAudience,
-                  content: rowObj.content || next[existingIndex].content,
-                  isPinned: rowObj.isPinned !== undefined ? (rowObj.isPinned === 'true' || rowObj.isPinned === true) : next[existingIndex].isPinned,
-                  referenceNo: rowObj.referenceNo || next[existingIndex].referenceNo
-                };
-                return next;
-              });
-              updated++;
-            } else {
-              duplicates++;
-            }
-          } else {
-            const newNot: SchoolNotice = {
-              id: `not-imp-${Date.now()}-${idx}`,
-              title: rowObj.title,
-              category: (rowObj.category as any) || 'General',
-              publishDate: rowObj.publishDate || new Date().toISOString().split('T')[0],
-              targetAudience: (rowObj.targetAudience as any) || 'All',
-              content: rowObj.content,
-              isPinned: rowObj.isPinned === 'true' || rowObj.isPinned === true,
-              referenceNo: rowObj.referenceNo || `JNV/NOT/${Date.now()}`,
-              status: 'Published'
-            };
-            setNotices(prev => [newNot, ...prev]);
-            imported++;
-          }
-        } else if (moduleType === 'events') {
-          if (!rowObj.title || !rowObj.date) {
-            errors.push(`Row ${rowIdx}: Missing required event title or date.`);
+          const newNotice: SchoolNotice = {
+            id: `not-imp-${Date.now()}-${idx}`,
+            title: rowObj.title,
+            category: (rowObj.category as any) || 'General',
+            publishDate: rowObj.publishDate || new Date().toISOString().split('T')[0],
+            targetAudience: (rowObj.targetAudience as any) || 'All',
+            content: rowObj.content,
+            isPinned: rowObj.isPinned === 'true' || rowObj.isPinned === true,
+            referenceNo: rowObj.referenceNo || `JNV/PACH/IMP/${Date.now()}`,
+            status: 'Published'
+          };
+          setNotices(prev => [newNotice, ...prev]);
+          saveDocToFirestore('notices', newNotice.id, newNotice);
+          imported++;
+        } else if (moduleType === 'faculty') {
+          if (!rowObj.name || !rowObj.department) {
+            errors.push(`Row ${rowIdx}: Missing faculty name or department.`);
             return;
           }
-          const title = (rowObj.title || '').toLowerCase().trim();
-          const date = (rowObj.date || '').trim();
-          const existingIndex = events.findIndex(e => 
-            (e.title || '').toLowerCase().trim() === title && (e.date || '').trim() === date
-          );
-
-          if (existingIndex >= 0) {
-            if (updateExisting) {
-              setEvents(prev => {
-                const next = [...prev];
-                next[existingIndex] = {
-                  ...next[existingIndex],
-                  category: (rowObj.category as any) || next[existingIndex].category,
-                  time: rowObj.time || next[existingIndex].time,
-                  location: rowObj.location || next[existingIndex].location,
-                  isOnline: rowObj.isOnline !== undefined ? (rowObj.isOnline === 'true' || rowObj.isOnline === true) : next[existingIndex].isOnline,
-                  maxCapacity: rowObj.maxCapacity ? Number(rowObj.maxCapacity) : next[existingIndex].maxCapacity,
-                  description: rowObj.description || next[existingIndex].description
-                };
-                return next;
-              });
-              updated++;
-            } else {
-              duplicates++;
-            }
-          } else {
-            const newEvt: AlumniEvent = {
-              id: `evt-imp-${Date.now()}-${idx}`,
-              title: rowObj.title,
-              category: (rowObj.category as any) || 'Reunion',
-              date: rowObj.date,
-              time: rowObj.time || '10:00 AM',
-              location: rowObj.location || 'JNV Campus',
-              isOnline: rowObj.isOnline === 'true' || rowObj.isOnline === true,
-              isAlumniEvent: rowObj.isAlumniEvent !== 'false',
-              maxCapacity: Number(rowObj.maxCapacity) || 200,
-              description: rowObj.description || '',
-              registeredCount: 0,
-              image: rowObj.image || 'https://images.unsplash.com/photo-1511578314322-379afb476865?w=600&h=350&fit=crop',
-              status: 'Upcoming'
-            };
-            setEvents(prev => [newEvt, ...prev]);
-            imported++;
-          }
-        } else if (moduleType === 'ledger') {
-          if (!rowObj.amount || !rowObj.description) {
-            errors.push(`Row ${rowIdx}: Missing required ledger amount or description.`);
+          const newFac: FacultyMember = {
+            id: `fac-imp-${Date.now()}-${idx}`,
+            name: rowObj.name,
+            designation: rowObj.designation || 'Faculty Teacher',
+            department: (rowObj.department as any) || 'Administration',
+            qualification: rowObj.qualification || 'M.Sc., B.Ed.',
+            experienceYears: Number(rowObj.experienceYears) || 5,
+            photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=400&fit=crop',
+            email: rowObj.email || '',
+            phone: rowObj.phone || ''
+          };
+          setFaculty(prev => [...prev, newFac]);
+          saveDocToFirestore('faculty', newFac.id, newFac);
+          imported++;
+        } else if (moduleType === 'blood_donors') {
+          if ((!rowObj.fullName && !rowObj.name) || !rowObj.bloodGroup || !rowObj.phone) {
+            errors.push(`Row ${rowIdx}: Missing Donor Name, Blood Group, or Phone.`);
             return;
           }
-          const txnId = (rowObj.transactionId || '').toLowerCase().trim();
-          const existingIndex = ledgerTransactions.findIndex(t => 
-            txnId && (t.transactionId || '').toLowerCase().trim() === txnId
-          );
-
-          if (existingIndex >= 0) {
-            if (updateExisting) {
-              setLedgerTransactions(prev => {
-                const next = [...prev];
-                next[existingIndex] = {
-                  ...next[existingIndex],
-                  type: rowObj.type === 'DEBIT' ? 'DEBIT' : 'CREDIT',
-                  category: (rowObj.category as any) || next[existingIndex].category,
-                  amount: Number(rowObj.amount) || next[existingIndex].amount,
-                  description: rowObj.description || next[existingIndex].description,
-                  date: rowObj.date || next[existingIndex].date,
-                  visibility: (rowObj.visibility as any) || next[existingIndex].visibility,
-                  auditedBy: rowObj.auditedBy || next[existingIndex].auditedBy,
-                  payeeOrDonor: rowObj.payeeOrDonor || next[existingIndex].payeeOrDonor
-                };
-                return next;
-              });
-              updated++;
-            } else {
-              duplicates++;
-            }
-          } else {
-            const newTx: FinancialTransaction = {
-              id: `tx-imp-${Date.now()}-${idx}`,
-              transactionId: rowObj.transactionId || `TXN-IMP-${Date.now()}-${idx}`,
-              type: rowObj.type === 'DEBIT' ? 'DEBIT' : 'CREDIT',
-              category: (rowObj.category as any) || 'Donations',
-              amount: Number(rowObj.amount) || 0,
-              description: rowObj.description,
-              date: rowObj.date || new Date().toISOString().split('T')[0],
-              visibility: (rowObj.visibility as any) || 'public',
-              auditedBy: rowObj.auditedBy || 'CA Auditor',
-              payeeOrDonor: rowObj.payeeOrDonor || ''
-            };
-            setLedgerTransactions(prev => [newTx, ...prev]);
-            imported++;
-          }
-        } else if (moduleType === 'financial_reports') {
-          if (!rowObj.title || !rowObj.financialYear) {
-            errors.push(`Row ${rowIdx}: Missing report title or financial year.`);
-            return;
-          }
-          const title = (rowObj.title || '').toLowerCase().trim();
-          const fy = (rowObj.financialYear || '').toLowerCase().trim();
-          const existingIndex = financialReports.findIndex(r => 
-            (r.title || '').toLowerCase().trim() === title && (r.financialYear || '').toLowerCase().trim() === fy
-          );
-
-          if (existingIndex >= 0) {
-            if (updateExisting) {
-              setFinancialReports(prev => {
-                const next = [...prev];
-                next[existingIndex] = {
-                  ...next[existingIndex],
-                  category: (rowObj.category as any) || next[existingIndex].category,
-                  reportSummary: rowObj.reportSummary || next[existingIndex].reportSummary,
-                  visibility: (rowObj.visibility as any) || next[existingIndex].visibility,
-                  auditorName: rowObj.auditorName || next[existingIndex].auditorName,
-                  amountAudited: rowObj.amountAudited ? Number(rowObj.amountAudited) : next[existingIndex].amountAudited
-                };
-                return next;
-              });
-              updated++;
-            } else {
-              duplicates++;
-            }
-          } else {
-            const newRep: FinancialReport = {
-              id: `rep-imp-${Date.now()}-${idx}`,
-              title: rowObj.title,
-              financialYear: rowObj.financialYear,
-              category: (rowObj.category as any) || 'Annual Audit Report',
-              reportSummary: rowObj.reportSummary || '',
-              visibility: (rowObj.visibility as any) || 'public',
-              publishedDate: new Date().toISOString().split('T')[0],
-              auditorName: rowObj.auditorName || 'Chartered Accountant',
-              amountAudited: Number(rowObj.amountAudited) || 0,
-              status: 'Published'
-            };
-            setFinancialReports(prev => [newRep, ...prev]);
-            imported++;
-          }
+          const newDonor: BloodDonor = {
+            id: `donor-imp-${Date.now()}-${idx}`,
+            name: rowObj.fullName || rowObj.name,
+            bloodGroup: (rowObj.bloodGroup as any) || 'O+',
+            city: rowObj.city || 'Balotra',
+            state: rowObj.state || 'Rajasthan',
+            phone: rowObj.phone,
+            email: rowObj.email || '',
+            batchYear: Number(rowObj.batchYear) || 2014,
+            lastDonatedDate: rowObj.lastDonatedDate || '2026-01-01',
+            isAvailable: rowObj.isAvailable !== 'false',
+            isVerified: true,
+            createdAt: new Date().toISOString()
+          };
+          setBloodDonors(prev => [newDonor, ...prev]);
+          saveDocToFirestore('blood_donors', newDonor.id, newDonor);
+          imported++;
         } else if (moduleType === 'toppers') {
           if (!rowObj.name || !rowObj.percentage) {
-            errors.push(`Row ${rowIdx}: Missing topper student name or percentage.`);
+            errors.push(`Row ${rowIdx}: Missing topper name or percentage.`);
             return;
           }
-          const name = (rowObj.name || '').toLowerCase().trim();
-          const year = Number(rowObj.year) || 2025;
-          const existingIndex = toppers.findIndex(t => 
-            (t.name || '').toLowerCase().trim() === name && t.year === year
-          );
-
-          if (existingIndex >= 0) {
-            if (updateExisting) {
-              setToppers(prev => {
-                const next = [...prev];
-                next[existingIndex] = {
-                  ...next[existingIndex],
-                  exam: rowObj.exam || next[existingIndex].exam,
-                  stream: rowObj.stream || next[existingIndex].stream,
-                  percentage: Number(rowObj.percentage) || next[existingIndex].percentage,
-                  currentPursuit: rowObj.currentPursuit || next[existingIndex].currentPursuit,
-                  photoUrl: rowObj.photoUrl || next[existingIndex].photoUrl
-                };
-                return next;
-              });
-              updated++;
-            } else {
-              duplicates++;
-            }
-          } else {
-            const newTop: BoardTopper = {
-              id: `top-imp-${Date.now()}-${idx}`,
-              name: rowObj.name,
-              exam: rowObj.exam || 'CBSE Class XII',
-              stream: rowObj.stream || 'Science',
-              percentage: Number(rowObj.percentage) || 95.0,
-              year: Number(rowObj.year) || 2025,
-              photoUrl: rowObj.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop',
-              currentPursuit: rowObj.currentPursuit || 'Higher Studies'
-            };
-            setToppers(prev => [...prev, newTop]);
-            imported++;
-          }
-        } else if (moduleType === 'blood_donors') {
-          const donorName = rowObj.fullName || rowObj.name;
-          if (!donorName || !rowObj.bloodGroup || !rowObj.phone) {
-            errors.push(`Row ${rowIdx}: Missing required donor name, bloodGroup, or phone.`);
-            return;
-          }
-          const phone = (rowObj.phone || '').trim();
-          const email = (rowObj.email || '').toLowerCase().trim();
-          const existingIndex = bloodDonors.findIndex(d => 
-            (phone && d.phone === phone) || (email && (d.email || '').toLowerCase().trim() === email)
-          );
-
-          if (existingIndex >= 0) {
-            if (updateExisting) {
-              setBloodDonors(prev => {
-                const next = [...prev];
-                next[existingIndex] = {
-                  ...next[existingIndex],
-                  name: donorName || next[existingIndex].name,
-                  bloodGroup: (rowObj.bloodGroup as any) || next[existingIndex].bloodGroup,
-                  city: rowObj.city || next[existingIndex].city,
-                  state: rowObj.state || next[existingIndex].state,
-                  isAvailable: rowObj.isAvailable !== undefined ? (rowObj.isAvailable === 'true' || rowObj.isAvailable === true) : next[existingIndex].isAvailable,
-                  lastDonatedDate: rowObj.lastDonatedDate || next[existingIndex].lastDonatedDate
-                };
-                return next;
-              });
-              updated++;
-            } else {
-              duplicates++;
-            }
-          } else {
-            const newDonor: BloodDonor = {
-              id: `donor-imp-${Date.now()}-${idx}`,
-              name: donorName,
-              bloodGroup: (rowObj.bloodGroup as any) || 'O+',
-              city: rowObj.city || 'Balotra',
-              state: rowObj.state || 'Rajasthan',
-              phone: rowObj.phone,
-              email: rowObj.email || '',
-              batchYear: Number(rowObj.batchYear) || 2015,
-              lastDonatedDate: rowObj.lastDonatedDate || '',
-              isAvailable: rowObj.isAvailable !== 'false',
-              isVerified: true,
-              emergencyContactNote: rowObj.hospitalOrArea || '',
-              createdAt: new Date().toISOString()
-            };
-            setBloodDonors(prev => [...prev, newDonor]);
-            imported++;
-          }
+          const newTop: BoardTopper = {
+            id: `top-imp-${Date.now()}-${idx}`,
+            name: rowObj.name,
+            exam: rowObj.exam || 'CBSE Class XII',
+            stream: rowObj.stream || 'Science',
+            percentage: Number(rowObj.percentage) || 95.0,
+            year: Number(rowObj.year) || 2025,
+            photoUrl: rowObj.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop',
+            currentPursuit: rowObj.currentPursuit || 'Higher Studies'
+          };
+          setToppers(prev => [newTop, ...prev]);
+          saveDocToFirestore('toppers', newTop.id, newTop);
+          imported++;
         } else if (moduleType === 'vmc_members') {
           if (!rowObj.name || !rowObj.designation) {
             errors.push(`Row ${rowIdx}: Missing VMC member name or designation.`);
             return;
           }
-          const name = (rowObj.name || '').toLowerCase().trim();
-          const existingIndex = vmcMembers.findIndex(m => 
-            (m.name || '').toLowerCase().trim() === name
-          );
-
-          if (existingIndex >= 0) {
-            if (updateExisting) {
-              setVmcMembers(prev => {
-                const next = [...prev];
-                next[existingIndex] = {
-                  ...next[existingIndex],
-                  designation: rowObj.designation || next[existingIndex].designation,
-                  organization: rowObj.organization || next[existingIndex].organization,
-                  phone: rowObj.phone || next[existingIndex].phone,
-                  email: rowObj.email || next[existingIndex].email
-                };
-                return next;
-              });
-              updated++;
-            } else {
-              duplicates++;
-            }
-          } else {
-            const newMember: VMCLeader = {
-              id: `vmc-imp-${Date.now()}-${idx}`,
-              name: rowObj.name,
-              designation: rowObj.designation,
-              organization: rowObj.organization || 'Institutional Council',
-              phone: rowObj.phone || '',
-              email: rowObj.email || ''
-            };
-            setVmcMembers(prev => [...prev, newMember]);
-            imported++;
-          }
+          const newMem: VMCLeader = {
+            id: `vmc-imp-${Date.now()}-${idx}`,
+            name: rowObj.name,
+            designation: rowObj.designation,
+            organization: rowObj.organization || 'Institutional Council',
+            phone: rowObj.phone || '',
+            email: rowObj.email || ''
+          };
+          setVmcMembers(prev => [...prev, newMem]);
+          saveDocToFirestore('vmc_members', newMem.id, newMem);
+          imported++;
         } else if (moduleType === 'donation_campaigns') {
           if (!rowObj.title || !rowObj.targetAmount) {
             errors.push(`Row ${rowIdx}: Missing campaign title or target amount.`);
             return;
           }
-          const title = (rowObj.title || '').toLowerCase().trim();
-          const existingIndex = donationCampaigns.findIndex(c => 
-            (c.title || '').toLowerCase().trim() === title
-          );
-
-          if (existingIndex >= 0) {
-            if (updateExisting) {
-              setDonationCampaigns(prev => {
-                const next = [...prev];
-                next[existingIndex] = {
-                  ...next[existingIndex],
-                  category: (rowObj.category as any) || next[existingIndex].category,
-                  targetAmount: Number(rowObj.targetAmount) || next[existingIndex].targetAmount,
-                  currentAmount: rowObj.currentAmount ? Number(rowObj.currentAmount) : next[existingIndex].currentAmount,
-                  donorsCount: rowObj.donorsCount || rowObj.donorCount ? Number(rowObj.donorsCount || rowObj.donorCount) : next[existingIndex].donorsCount,
-                  isActive: rowObj.isActive !== undefined ? (rowObj.isActive === 'true' || rowObj.isActive === true) : next[existingIndex].isActive,
-                  endDate: rowObj.endDate || next[existingIndex].endDate,
-                  description: rowObj.description || next[existingIndex].description
-                };
-                return next;
-              });
-              updated++;
-            } else {
-              duplicates++;
-            }
-          } else {
-            const newCamp: DonationCampaign = {
-              id: `camp-imp-${Date.now()}-${idx}`,
-              title: rowObj.title,
-              category: (rowObj.category as any) || 'Infrastructure',
-              targetAmount: Number(rowObj.targetAmount) || 100000,
-              currentAmount: Number(rowObj.currentAmount) || 0,
-              donorsCount: Number(rowObj.donorsCount || rowObj.donorCount) || 0,
-              isActive: rowObj.isActive !== 'false',
-              endDate: rowObj.endDate || '2026-12-31',
-              description: rowObj.description || '',
-              coverImage: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?w=600&h=350&fit=crop',
-              createdAt: new Date().toISOString()
-            };
-            setDonationCampaigns(prev => [...prev, newCamp]);
-            imported++;
-          }
+          const newCamp: DonationCampaign = {
+            id: `camp-imp-${Date.now()}-${idx}`,
+            title: rowObj.title,
+            category: (rowObj.category as any) || 'Infrastructure',
+            targetAmount: Number(rowObj.targetAmount) || 100000,
+            currentAmount: Number(rowObj.currentAmount) || 0,
+            donorsCount: Number(rowObj.donorsCount || rowObj.donorCount) || 0,
+            isActive: rowObj.isActive !== 'false',
+            endDate: rowObj.endDate || '2026-12-31',
+            description: rowObj.description || '',
+            coverImage: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?w=600&h=350&fit=crop',
+            createdAt: new Date().toISOString()
+          };
+          setDonationCampaigns(prev => [...prev, newCamp]);
+          saveDocToFirestore('donationCampaigns', newCamp.id, newCamp);
+          imported++;
         } else if (moduleType === 'jobs') {
           if (!rowObj.title || !rowObj.company) {
             errors.push(`Row ${rowIdx}: Missing job title or company.`);
             return;
           }
-          const title = (rowObj.title || '').toLowerCase().trim();
-          const company = (rowObj.company || '').toLowerCase().trim();
-          const existingIndex = jobs.findIndex(j => 
-            (j.title || '').toLowerCase().trim() === title && (j.company || '').toLowerCase().trim() === company
-          );
-
-          if (existingIndex >= 0) {
-            if (updateExisting) {
-              setJobs(prev => {
-                const next = [...prev];
-                next[existingIndex] = {
-                  ...next[existingIndex],
-                  location: rowObj.location || next[existingIndex].location,
-                  employmentType: (rowObj.employmentType as any) || next[existingIndex].employmentType,
-                  experience: rowObj.experience || next[existingIndex].experience,
-                  salaryRange: rowObj.salaryRange || next[existingIndex].salaryRange,
-                  description: rowObj.description || next[existingIndex].description,
-                  applyLinkOrEmail: rowObj.applyLinkOrEmail || next[existingIndex].applyLinkOrEmail
-                };
-                return next;
-              });
-              updated++;
-            } else {
-              duplicates++;
-            }
-          } else {
-            const newJob: JobPosting = {
-              id: `job-imp-${Date.now()}-${idx}`,
-              title: rowObj.title,
-              company: rowObj.company,
-              location: rowObj.location || 'Remote',
-              employmentType: (rowObj.employmentType as any) || 'Full-Time',
-              experience: rowObj.experience || '2+ Years',
-              salaryRange: rowObj.salaryRange || '',
-              description: rowObj.description || '',
-              applyLinkOrEmail: rowObj.applyLinkOrEmail || 'careers@alumni.jnv.in',
-              postedByName: rowObj.postedByName || 'Alumni Admin',
-              postedByBatch: Number(rowObj.postedByBatch) || 2012,
-              postedByEmail: rowObj.postedByEmail || 'admin@alumni.jnv.in',
-              isActive: true,
-              createdAt: new Date().toISOString()
-            };
-            setJobs(prev => [newJob, ...prev]);
-            imported++;
-          }
+          const newJob: JobPosting = {
+            id: `job-imp-${Date.now()}-${idx}`,
+            title: rowObj.title,
+            company: rowObj.company,
+            location: rowObj.location || 'Remote',
+            employmentType: (rowObj.employmentType as any) || 'Full-Time',
+            experience: rowObj.experience || '2+ Years',
+            salaryRange: rowObj.salaryRange || '',
+            description: rowObj.description || '',
+            applyLinkOrEmail: rowObj.applyLinkOrEmail || 'careers@alumni.jnv.in',
+            postedByName: rowObj.postedByName || 'Alumni Admin',
+            postedByBatch: Number(rowObj.postedByBatch) || 2012,
+            postedByEmail: rowObj.postedByEmail || 'admin@alumni.jnv.in',
+            isActive: true,
+            createdAt: new Date().toISOString()
+          };
+          setJobs(prev => [newJob, ...prev]);
+          saveDocToFirestore('jobs', newJob.id, newJob);
+          imported++;
         } else if (moduleType === 'businesses') {
           if (!rowObj.name || !rowObj.ownerName) {
             errors.push(`Row ${rowIdx}: Missing business name or owner name.`);
             return;
           }
-          const name = (rowObj.name || '').toLowerCase().trim();
-          const existingIndex = businesses.findIndex(b => 
-            (b.name || '').toLowerCase().trim() === name
-          );
-
-          if (existingIndex >= 0) {
-            if (updateExisting) {
-              setBusinesses(prev => {
-                const next = [...prev];
-                next[existingIndex] = {
-                  ...next[existingIndex],
-                  category: rowObj.category || next[existingIndex].category,
-                  ownerName: rowObj.ownerName || next[existingIndex].ownerName,
-                  ownerBatch: rowObj.ownerBatch ? Number(rowObj.ownerBatch) : next[existingIndex].ownerBatch,
-                  ownerEmail: rowObj.ownerEmail || next[existingIndex].ownerEmail,
-                  ownerPhone: rowObj.ownerPhone || next[existingIndex].ownerPhone,
-                  website: rowObj.website || next[existingIndex].website,
-                  description: rowObj.description || next[existingIndex].description,
-                  city: rowObj.city || next[existingIndex].city,
-                  discountForAlumni: rowObj.discountForAlumni || next[existingIndex].discountForAlumni,
-                  isVerified: rowObj.isVerified !== undefined ? (rowObj.isVerified === 'true' || rowObj.isVerified === true) : next[existingIndex].isVerified
-                };
-                return next;
-              });
-              updated++;
-            } else {
-              duplicates++;
-            }
-          } else {
-            const newBiz: BusinessListing = {
-              id: `biz-imp-${Date.now()}-${idx}`,
-              name: rowObj.name,
-              category: rowObj.category || 'Services',
-              ownerName: rowObj.ownerName,
-              ownerBatch: Number(rowObj.ownerBatch) || 2012,
-              ownerEmail: rowObj.ownerEmail || '',
-              ownerPhone: rowObj.ownerPhone || '',
-              website: rowObj.website || '',
-              description: rowObj.description || '',
-              isVerified: rowObj.isVerified !== 'false',
-              city: rowObj.city || 'Balotra',
-              discountForAlumni: rowObj.discountForAlumni || 'Special alumni discount',
-              createdAt: new Date().toISOString()
-            };
-            setBusinesses(prev => [newBiz, ...prev]);
-            imported++;
-          }
+          const newBiz: BusinessListing = {
+            id: `biz-imp-${Date.now()}-${idx}`,
+            name: rowObj.name,
+            category: rowObj.category || 'Services',
+            ownerName: rowObj.ownerName,
+            ownerBatch: Number(rowObj.ownerBatch) || 2012,
+            ownerEmail: rowObj.ownerEmail || '',
+            ownerPhone: rowObj.ownerPhone || '',
+            website: rowObj.website || '',
+            description: rowObj.description || '',
+            isVerified: rowObj.isVerified !== 'false',
+            city: rowObj.city || 'Balotra',
+            discountForAlumni: rowObj.discountForAlumni || 'Special alumni discount',
+            createdAt: new Date().toISOString()
+          };
+          setBusinesses(prev => [newBiz, ...prev]);
+          saveDocToFirestore('businesses', newBiz.id, newBiz);
+          imported++;
         }
       } catch (err: any) {
         errors.push(`Row ${rowIdx}: Parse error - ${err.message}`);
@@ -2117,6 +2111,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         schoolSettings,
         updateSchoolSettings,
+        paymentSettings,
+        updatePaymentSettings,
         houses,
         updateHouse,
         toppers,
@@ -2183,6 +2179,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteDonationCampaign,
         donationRecords,
         recordDonation,
+        verifyDonationRecord,
+        rejectDonationRecord,
+        deleteDonationRecord,
 
         bloodDonors,
         addBloodDonor,
@@ -2243,6 +2242,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         importFromCSV,
         getCSVTemplate,
 
+        isPersistenceLoaded,
         resetToDefaultSeedData,
 
         activeTab,

@@ -26,7 +26,9 @@ import {
   VMCLeader,
   HouseInfo,
   BloodDonor,
-  BloodRequest
+  BloodRequest,
+  PaymentSettings,
+  DonationRecord
 } from '../types';
 
 export const SEED_SCHOOL_SETTINGS: SchoolSettings = {
@@ -1528,4 +1530,93 @@ export const SEED_VMC_MEMBERS = [
     organization: 'Navodaya Vidyalaya Samiti'
   }
 ];
+
+export const SEED_PAYMENT_SETTINGS: PaymentSettings = {
+  id: 'default',
+  accountHolderName: 'Pachpadra Navodaya Alumni Association (PNAA)',
+  bankName: 'State Bank of India (SBI)',
+  accountNumber: '38472910482',
+  ifscCode: 'SBIN0031124',
+  swiftCode: 'SBININBB312',
+  branchName: 'Main Market Branch, Pachpadra, Barmer, Rajasthan',
+  upiId: 'jnvpachpadra.alumni@sbi',
+  upiQrImageUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=jnvpachpadra.alumni@sbi%26pn=JNV%20Pachpadra%20Alumni%20Association%26cu=INR',
+  paymentInstructions: '1. Scan the official UPI QR code or transfer directly to the SBI Savings Bank Account.\n2. Please enter your name and batch in the transaction remarks.\n3. After successful transfer, upload your Transaction Ref / UTR number on this portal.\n4. Your official 80G Tax Exemption Receipt (50% tax deduction) will be verified and issued instantly.',
+  donationContactEmail: 'alumni.giving@jnvpachpadra.in',
+  donationContactPhone: '+91 94140 12345',
+  currency: 'INR (₹)',
+  minDonationAmount: 100,
+  enableUpi: true,
+  enableBankTransfer: true,
+  enablePaymentGateway: true,
+  enableManualOther: true,
+  reg80GNumber: 'CIT(E)/JDR/80G/2021-22/A/10492',
+  taxBenefitPercentage: 50,
+  updatedAt: new Date().toISOString()
+};
+
+export const SEED_DONATIONS: DonationRecord[] = [
+  {
+    id: 'don-1',
+    campaignId: 'camp-1',
+    campaignTitle: 'Smart Robotics & AI Lab Infrastructure',
+    donorName: 'Dr. Sunita Choudhary',
+    donorEmail: 'sunita.ias@rajasthan.gov.in',
+    donorPhone: '+91 98290 12345',
+    donorPan: 'ABCPS1234F',
+    donorBatch: 2004,
+    amount: 50000,
+    paymentMode: 'Direct Bank Transfer',
+    transactionRef: 'SBI98234871923',
+    receiptNumber: '80G-JNV-2025-001',
+    taxExempt80GRegNo: 'CIT(E)/JDR/80G/2021-22/A/10492',
+    paymentStatus: 'VERIFIED',
+    isAnonymous: false,
+    note: 'For the next generation of rural Navodayan innovators in robotics and AI.',
+    verifiedBy: 'prakashinfosys1234@gmail.com',
+    verifiedAt: '2025-01-15T10:00:00.000Z',
+    createdAt: '2025-01-14T14:30:00.000Z'
+  },
+  {
+    id: 'don-2',
+    campaignId: 'camp-2',
+    campaignTitle: 'Navodaya Pratibha Merit Scholarship Fund',
+    donorName: 'Vikram Singh Shekhawat',
+    donorEmail: 'vikram.shekhawat@google.com',
+    donorPhone: '+91 99887 66554',
+    donorPan: 'BKFPS9981K',
+    donorBatch: 2008,
+    amount: 25000,
+    paymentMode: 'UPI',
+    transactionRef: 'UPI/402819283719',
+    receiptNumber: '80G-JNV-2025-002',
+    taxExempt80GRegNo: 'CIT(E)/JDR/80G/2021-22/A/10492',
+    paymentStatus: 'VERIFIED',
+    isAnonymous: false,
+    note: 'Scholarship support for meritorious students joining IITs & AIIMS.',
+    verifiedBy: 'prakashinfosys1234@gmail.com',
+    verifiedAt: '2025-02-01T11:20:00.000Z',
+    createdAt: '2025-02-01T09:15:00.000Z'
+  },
+  {
+    id: 'don-3',
+    campaignId: 'camp-3',
+    campaignTitle: 'National Sports & Athletes Kit Support',
+    donorName: 'Rajesh Kumar Verma',
+    donorEmail: 'rajesh.ca@audit.in',
+    donorPhone: '+91 97112 33445',
+    donorPan: 'AQRPV4432L',
+    donorBatch: 2011,
+    amount: 15000,
+    paymentMode: 'UPI',
+    transactionRef: 'UPI/503918274819',
+    receiptNumber: '80G-JNV-2025-003',
+    taxExempt80GRegNo: 'CIT(E)/JDR/80G/2021-22/A/10492',
+    paymentStatus: 'PENDING',
+    isAnonymous: false,
+    note: 'Sports shoes and athletic kits for regional cluster athletics team.',
+    createdAt: '2025-03-01T08:45:00.000Z'
+  }
+];
+
 

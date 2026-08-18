@@ -3,12 +3,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Global fallback
-    match /{document=**} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-
     function isSignedIn() {
       return request.auth != null;
     }
@@ -16,15 +10,26 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email == 'prakashinfosys1234@gmail.com' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        exists(/databases/$(database)/documents/user_roles/$(request.auth.uid))
       );
+    }
+
+    // Default catch-all
+    match /{document=**} {
+      allow read: if true;
+      allow write: if isSignedIn();
     }
 
     // Alumni Profiles
     match /alumniProfiles/{profileId} {
       allow read: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+    match /alumni/{profileId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
       allow delete: if isAdmin();
     }
 
@@ -54,57 +59,168 @@ service cloud.firestore {
       allow create, update: if isSignedIn();
       allow delete: if isAdmin();
     }
+    match /welfare_cases/{caseId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
 
     // Donation Campaigns
     match /donationCampaigns/{campaignId} {
       allow read: if true;
-      allow create, update, delete: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+    match /donation_campaigns/{campaignId} {
+      allow read: if true;
+      allow write: if isSignedIn();
     }
 
-    // Donations
+    // Donations & 80G Receipts
     match /donations/{donationId} {
       allow read: if true;
       allow create: if true;
-      allow update, delete: if isAdmin();
+      allow update, delete: if isSignedIn();
     }
 
-    // Financial Transactions Ledger
+    // Payment Settings (UPI, QR Code, Bank Account & 80G Reg)
+    match /payment_settings/{settingId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // School Settings (Principal, metrics, announcements)
+    match /school_settings/{settingId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // School Notices & Circulars
+    match /notices/{noticeId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Faculty & Staff Directory
+    match /faculty/{facultyId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Photo Gallery
+    match /gallery/{galleryId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Admission Enquiries
+    match /admission_enquiries/{enquiryId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isSignedIn();
+    }
+
+    // Board Toppers
+    match /toppers/{topperId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // VMC Members
+    match /vmc_members/{memberId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Houses
+    match /houses/{houseId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Blood Donors
+    match /blood_donors/{donorId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // Blood Requests (Emergency SOS)
+    match /blood_requests/{requestId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isSignedIn();
+    }
+
+    // Financial Transactions Ledger & Reports
     match /financialTransactions/{txId} {
       allow read: if true;
       allow write: if isSignedIn();
     }
-
-    // Events
-    match /events/{eventId} {
+    match /financial_transactions/{txId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+    match /financial_reports/{reportId} {
       allow read: if true;
       allow write: if isSignedIn();
     }
 
-    // Elections
+    // Events & RSVPs
+    match /events/{eventId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+    match /event_rsvps/{rsvpId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Elections, Nominations & Votes
     match /elections/{electionId} {
       allow read: if true;
       allow write: if isSignedIn();
+    }
+    match /nominations/{nominationId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+    match /votes/{voteId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
     }
 
     // Memories Archive
     match /memories/{memoryId} {
       allow read: if true;
       allow create, update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow delete: if isSignedIn();
     }
 
     // Achievements & Wall of Fame
     match /achievements/{achievementId} {
       allow read: if true;
       allow create, update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow delete: if isSignedIn();
+    }
+
+    // User Roles & RBAC
+    match /user_roles/{roleId} {
+      allow read: if true;
+      allow write: if isSignedIn();
     }
 
     // Audit Logs
     match /auditLogs/{logId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isAdmin();
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isSignedIn();
+    }
+    match /audit_logs/{logId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isSignedIn();
     }
   }
 }

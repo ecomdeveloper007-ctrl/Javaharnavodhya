@@ -170,14 +170,42 @@ export interface DonationRecord {
   donorPan?: string;
   donorBatch?: number;
   amount: number;
-  paymentMode: 'UPI' | 'Card' | 'NetBanking' | 'Direct Bank Transfer';
+  paymentMode: 'UPI' | 'Card' | 'NetBanking' | 'Direct Bank Transfer' | 'Cash / Cheque';
   transactionRef: string;
   receiptNumber: string;
   taxExempt80GRegNo: string;
-  paymentStatus: 'SUCCESS' | 'PENDING';
+  paymentStatus: 'SUCCESS' | 'PENDING' | 'VERIFIED' | 'REJECTED';
   isAnonymous: boolean;
   note?: string;
+  receiptImageUrl?: string;
+  rejectionReason?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
   createdAt: string;
+}
+
+export interface PaymentSettings {
+  id: string;
+  accountHolderName: string;
+  bankName: string;
+  accountNumber: string;
+  ifscCode: string;
+  swiftCode?: string;
+  branchName: string;
+  upiId: string;
+  upiQrImageUrl?: string;
+  paymentInstructions: string;
+  donationContactEmail: string;
+  donationContactPhone: string;
+  currency: string;
+  minDonationAmount: number;
+  enableUpi: boolean;
+  enableBankTransfer: boolean;
+  enablePaymentGateway: boolean;
+  enableManualOther: boolean;
+  reg80GNumber: string;
+  taxBenefitPercentage: number;
+  updatedAt: string;
 }
 
 export type FinancialVisibility = 'public' | 'alumni_only' | 'admin_only';
@@ -480,3 +508,14 @@ export interface SchoolSettings {
   bankBranch: string;
   upiId: string;
 }
+
+export interface CSVImportResult {
+  success: boolean;
+  importedCount: number;
+  updatedCount: number;
+  duplicateCount: number;
+  totalProcessed: number;
+  errors: string[];
+  message: string;
+}
+

@@ -160,6 +160,23 @@ export interface BloodRequest {
   createdAt: string;
 }
 
+export type PaymentStatus =
+  | 'PAYMENT_PENDING'
+  | 'PAYMENT_VERIFIED'
+  | 'FAILED'
+  | 'REFUNDED'
+  | 'SUCCESS'
+  | 'PENDING'
+  | 'VERIFIED'
+  | 'REJECTED';
+
+export type Compliance80GStatus =
+  | 'NOT_APPLICABLE'
+  | '80G_ELIGIBLE'
+  | '80G_PROCESSED'
+  | 'FORM_10BE_PENDING'
+  | 'FORM_10BE_COMPLETED';
+
 export interface DonationRecord {
   id: string;
   campaignId?: string;
@@ -168,17 +185,25 @@ export interface DonationRecord {
   donorEmail: string;
   donorPhone?: string;
   donorPan?: string;
+  maskedPan?: string;
   donorBatch?: number;
   amount: number;
   paymentMode: 'UPI' | 'Card' | 'NetBanking' | 'Direct Bank Transfer' | 'Cash / Cheque';
   transactionRef: string;
   receiptNumber: string;
   taxExempt80GRegNo: string;
-  paymentStatus: 'SUCCESS' | 'PENDING' | 'VERIFIED' | 'REJECTED';
+  paymentStatus: PaymentStatus;
+  compliance80GStatus?: Compliance80GStatus;
+  complianceNotes?: string;
   isAnonymous: boolean;
   note?: string;
   receiptImageUrl?: string;
   rejectionReason?: string;
+  paymentGatewayOrderId?: string;
+  paymentGatewayPaymentId?: string;
+  paymentGatewaySignature?: string;
+  isVerifiedByGateway?: boolean;
+  gatewayProvider?: string;
   verifiedBy?: string;
   verifiedAt?: string;
   createdAt: string;
@@ -343,6 +368,34 @@ export interface ElectionAuditLog {
   actorName: string;
   actorEmail: string;
   details: string;
+  timestamp: string;
+}
+
+export type SystemAuditAction =
+  | 'login_access'
+  | 'role_change'
+  | 'user_moderation'
+  | 'donation_created'
+  | 'payment_verified'
+  | 'receipt_generated'
+  | 'compliance_update'
+  | 'financial_change'
+  | 'election_change'
+  | 'cms_change'
+  | 'bulk_import'
+  | 'security_event';
+
+export interface SystemAuditLog {
+  id: string;
+  action: SystemAuditAction;
+  actorEmail: string;
+  actorRole?: string;
+  actorName?: string;
+  targetId?: string;
+  targetCollection?: string;
+  details: string;
+  metadata?: Record<string, any>;
+  ipAddress?: string;
   timestamp: string;
 }
 

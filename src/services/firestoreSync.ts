@@ -164,6 +164,60 @@ export async function updateDocInFirestore(
 }
 
 /**
+ * Mask PAN numbers for privacy (e.g. ABCDE1234F -> ABCDE****F)
+ */
+export function maskPAN(pan?: string): string {
+  if (!pan) return '';
+  const clean = pan.trim().toUpperCase();
+  if (clean.length < 10) return 'XXXXX****X';
+  return `${clean.substring(0, 5)}****${clean.substring(9)}`;
+}
+
+/**
+ * Record an immutable security/system audit log entry
+ */
+export async function recordAuditLog(
+  action: string,
+  actorEmail: string,
+  actorRole: string,
+  details: string,
+  targetId?: string,
+  targetCollection?: string,
+  metadata?: Record<string, any>
+): Promise<void> {
+  const logId = `AUDIT-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const logEntry = {
+    id: logId,
+    action,
+    actorEmail: actorEmail || 'unauthenticated',
+    actorRole: actorRole || 'guest',
+    details,
+    targetId: targetId || '',
+    targetCollection: targetCollection || '',
+    metadata: metadata || {},
+    timestamp: new Date().toISOString()
+  };
+
+  try {
+    const docRef = doc(db, 'audit_logs', logId);
+    await setDoc(docRef, sanitizeForFirestore(logEntry));
+  } catch (err) {
+    console.warn('[Audit Log] Failed to persist log directly to Firestore (may lack permissions):', err);
+  }
+
+  // Also call backend audit logger if available
+  try {
+    fetch('/api/audit/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(logEntry)
+    }).catch(() => {});
+  } catch {
+    // Ignore offline/background errors
+  }
+}
+
+/**
  * Delete a document from Firestore permanently
  */
 export async function deleteDocFromFirestore(
@@ -178,3 +232,5 @@ export async function deleteDocFromFirestore(
     throw error;
   }
 }
+
+

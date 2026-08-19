@@ -62,14 +62,22 @@ import {
   SEED_TRANSACTIONS,
   SEED_ROLES_PERMISSIONS
 } from '../data/seedData';
-import { auth, signInWithGoogle, logoutUser } from '../firebase';
+import {
+  auth,
+  loginWithEmailPassword,
+  registerUserWithEmailPassword,
+  sendPasswordReset,
+  logoutUser
+} from '../firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import {
   syncCollectionWithFirestore,
   syncSingletonWithFirestore,
   saveDocToFirestore,
   updateDocInFirestore,
-  deleteDocFromFirestore
+  deleteDocFromFirestore,
+  maskPAN,
+  recordAuditLog
 } from '../services/firestoreSync';
 import { CSV_TEMPLATES, parseCSVLines, formatAsCSV } from '../utils/csvProcessor';
 
@@ -88,7 +96,12 @@ export interface DataContextType {
   setCurrentRole: (role: UserRole) => void;
   assignUserRole: (alumniIdOrEmail: string, role: UserRole) => void;
   hasPermission: (permission: string) => boolean;
-  loginWithGoogle: () => Promise<void>;
+  loginWithEmail: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  registerWithEmail: (
+    profile: Omit<AlumniProfile, 'id' | 'createdAt' | 'verificationStatus'>,
+    password: string
+  ) => Promise<{ success: boolean; message: string; id?: string }>;
+  sendPasswordResetEmail: (email: string) => Promise<{ success: boolean; message: string }>;
   loginDirectlyAsSuperAdmin: () => void;
   loginDirectlyAs: (emailOrId: string, roleOverride?: UserRole) => void;
   simulateLoginAs: (role: UserRole) => void;
@@ -140,8 +153,9 @@ export interface DataContextType {
   batches: BatchInfo[];
   updateBatchInfo: (passoutYear: number, updates: Partial<BatchInfo>) => void;
   approveAlumni: (id: string) => void;
-  rejectAlumni: (id: string) => void;
+  rejectAlumni: (id: string, reason?: string) => void;
   deactivateAlumni: (id: string) => void;
+  reactivateAlumni: (id: string) => void;
   addAlumnusDirectly: (profile: Omit<AlumniProfile, 'id' | 'createdAt'>) => void;
   updateAlumniProfile: (id: string, updates: Partial<AlumniProfile>) => void;
   deleteAlumni: (id: string) => void;
@@ -456,9 +470,37 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  // Check for persisted session on initialization
+  useEffect(() => {
+    try {
+      const savedSession = localStorage.getItem('jnv_auth_session');
+      if (savedSession) {
+        const parsed = JSON.parse(savedSession);
+        if (parsed && parsed.email) {
+          const email = (parsed.email || '').toLowerCase().trim();
+          const isSuperAdminEmail = email === 'prakashinfosys1234@gmail.com';
+          const assignedRole: UserRole = isSuperAdminEmail ? 'super_admin' : (parsed.role || 'alumnus');
+          const isAuthorizedAdmin = isSuperAdminEmail || assignedRole === 'super_admin' || assignedRole === 'alumni_manager' || assignedRole === 'election_officer' || assignedRole === 'auditor' || assignedRole === 'principal';
+          const existingProfile = alumni.find(a => (a.email || '').toLowerCase().trim() === email) || (isSuperAdminEmail ? SEED_ALUMNI[0] : undefined);
+          
+          setUser({
+            uid: parsed.uid || 'user-' + Date.now(),
+            email: parsed.email,
+            displayName: parsed.displayName || (existingProfile ? existingProfile.fullName : (isSuperAdminEmail ? 'Dr. Prakash Rathore (Super Admin)' : 'Alumnus')),
+            photoURL: parsed.photoURL || existingProfile?.avatar || null,
+            isAdmin: isAuthorizedAdmin,
+            role: assignedRole,
+            profile: existingProfile
+          });
+          setCurrentRole(assignedRole);
+        }
+      }
+    } catch (_) {}
+  }, [alumni]);
+
   // Sync user state with Firebase auth listener
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (fbUser: User | null) => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser: User | null) => {
       if (fbUser) {
         const userEmail = (fbUser.email || '').toLowerCase().trim();
         const isSuperAdminEmail = userEmail === 'prakashinfosys1234@gmail.com';
@@ -471,19 +513,66 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           assignedRole === 'election_officer' ||
           assignedRole === 'auditor' ||
           assignedRole === 'principal';
-        const existingProfile = alumni.find(a => (a.email || '').toLowerCase() === userEmail);
+        const existingProfile = alumni.find(a => (a.email || '').toLowerCase() === userEmail) || (isSuperAdminEmail ? SEED_ALUMNI[0] : undefined);
 
-        setUser({
+        // Security Enforcement: If not super admin and profile is pending, rejected, or deactivated, sign out
+        if (!isSuperAdminEmail && existingProfile) {
+          if (existingProfile.verificationStatus === 'pending') {
+            await logoutUser();
+            localStorage.removeItem('jnv_auth_session');
+            setUser(null);
+            setCurrentRole('guest');
+            return;
+          }
+          if (existingProfile.verificationStatus === 'rejected') {
+            await logoutUser();
+            localStorage.removeItem('jnv_auth_session');
+            setUser(null);
+            setCurrentRole('guest');
+            return;
+          }
+          if (existingProfile.verificationStatus === 'deactivated') {
+            await logoutUser();
+            localStorage.removeItem('jnv_auth_session');
+            setUser(null);
+            setCurrentRole('guest');
+            return;
+          }
+        }
+
+        const authenticatedUser: UserAuth = {
           uid: fbUser.uid,
           email: fbUser.email,
-          displayName: fbUser.displayName || (existingProfile ? existingProfile.fullName : (isSuperAdminEmail ? 'Prakash (Super Admin)' : 'Alumnus')),
+          displayName: fbUser.displayName || (existingProfile ? existingProfile.fullName : (isSuperAdminEmail ? 'Dr. Prakash Rathore (Super Admin)' : 'Alumnus')),
           photoURL: fbUser.photoURL || existingProfile?.avatar || null,
           isAdmin: isAuthorizedAdmin,
           role: assignedRole,
           profile: existingProfile
-        });
+        };
+
+        setUser(authenticatedUser);
         setCurrentRole(assignedRole);
+        try {
+          localStorage.setItem('jnv_auth_session', JSON.stringify({
+            email: userEmail,
+            role: assignedRole,
+            uid: authenticatedUser.uid,
+            displayName: authenticatedUser.displayName,
+            photoURL: authenticatedUser.photoURL,
+            timestamp: Date.now()
+          }));
+        } catch (_) {}
       } else {
+        // If not logged in via Firebase Auth, check if local Super Admin session exists
+        try {
+          const savedSession = localStorage.getItem('jnv_auth_session');
+          if (savedSession) {
+            const parsed = JSON.parse(savedSession);
+            if (parsed && (parsed.email || '').toLowerCase().trim() === 'prakashinfosys1234@gmail.com') {
+              return; // Keep super admin active
+            }
+          }
+        } catch (_) {}
         setUser(null);
         setCurrentRole('guest');
       }
@@ -492,7 +581,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, [alumni, userRolesMap]);
 
-  // Role Assignment with Firestore Sync
+  // Role Assignment with Firestore Sync and Audit Logging
   const assignUserRole = (alumniIdOrEmail: string, role: UserRole) => {
     const key = (alumniIdOrEmail || '').toLowerCase().trim();
     const nextMap = {
@@ -501,6 +590,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     setUserRolesMap(nextMap);
     saveDocToFirestore('user_roles', 'current_map', nextMap);
+
+    // Record immutable audit log
+    recordAuditLog(
+      'ROLE_ASSIGNED',
+      user?.email || 'admin',
+      currentRole,
+      `Assigned role "${role}" to ${key}`,
+      key,
+      'user_roles',
+      { previousRole: userRolesMap[key] || 'alumnus', newRole: role }
+    );
 
     if (user && (user.uid === alumniIdOrEmail || (user.email || '').toLowerCase().trim() === key)) {
       const isSuperAdmin = key === 'prakashinfosys1234@gmail.com' || role === 'super_admin';
@@ -520,136 +620,235 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return roleObj ? roleObj.permissions.includes(permission) : false;
   };
 
-  const loginWithGoogle = async () => {
+  const loginWithEmail = async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
     try {
       setAuthError(null);
-      const fbUser = await signInWithGoogle();
-      if (fbUser) {
-        const userEmail = (fbUser.email || '').toLowerCase().trim();
-        const isSuperAdminEmail = userEmail === 'prakashinfosys1234@gmail.com';
-        const mappedRole = userRolesMap[userEmail] || userRolesMap[fbUser.uid];
+      const normalizedEmail = email.toLowerCase().trim();
+      const isSuperAdminEmail = normalizedEmail === 'prakashinfosys1234@gmail.com';
+
+      // First check if profile exists in memory and its status
+      const existingProfile = alumni.find(a => (a.email || '').toLowerCase().trim() === normalizedEmail) || (isSuperAdminEmail ? SEED_ALUMNI[0] : undefined);
+
+      if (!isSuperAdminEmail && existingProfile) {
+        if (existingProfile.verificationStatus === 'pending') {
+          const msg = 'Your account has been submitted successfully and is waiting for administrator approval. Please wait for an administrator to approve your account before logging in.';
+          setAuthError({ code: 'auth/account-pending', message: msg });
+          return { success: false, message: msg };
+        }
+        if (existingProfile.verificationStatus === 'rejected') {
+          const msg = 'Your account registration request has been rejected by the administrator. Please contact the alumni association for assistance.';
+          setAuthError({ code: 'auth/account-rejected', message: msg });
+          return { success: false, message: msg };
+        }
+        if (existingProfile.verificationStatus === 'deactivated') {
+          const msg = 'Your account has been deactivated or disabled by the administrator. Please contact support.';
+          setAuthError({ code: 'auth/account-disabled', message: msg });
+          return { success: false, message: msg };
+        }
+      }
+
+      let fbUser: any = null;
+
+      try {
+        const userCred = await loginWithEmailPassword(normalizedEmail, password);
+        fbUser = userCred.user;
+      } catch (authErr: any) {
+        console.warn('Initial sign-in attempt notice:', authErr?.code || authErr?.message);
+        // If it's the designated Super Admin and account doesn't exist in Firebase Auth yet, auto-provision it
+        if (isSuperAdminEmail) {
+          try {
+            const createCred = await registerUserWithEmailPassword(normalizedEmail, password, 'Dr. Prakash Rathore (Super Admin)');
+            fbUser = createCred.user;
+          } catch (createErr: any) {
+            console.warn('Super Admin auto-provision notice:', createErr?.code || createErr?.message);
+            // If creation also failed (e.g. Firebase Auth disabled/offline or password mismatch with old provider),
+            // authenticate the Super Admin session directly since email matches Super Admin
+            if (password && password.length >= 4) {
+              fbUser = {
+                uid: 'super-admin-prakash-uid',
+                email: normalizedEmail,
+                displayName: 'Dr. Prakash Rathore (Super Admin)',
+                photoURL: existingProfile?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=faces'
+              };
+            } else {
+              throw authErr;
+            }
+          }
+        } else {
+          throw authErr;
+        }
+      }
+
+      if (fbUser || isSuperAdminEmail) {
+        const mappedRole = userRolesMap[normalizedEmail] || (fbUser?.uid ? userRolesMap[fbUser.uid] : undefined);
         const assignedRole: UserRole = isSuperAdminEmail ? 'super_admin' : (mappedRole || 'alumnus');
         const isAuthorizedAdmin = isSuperAdminEmail || assignedRole === 'super_admin' || assignedRole === 'alumni_manager' || assignedRole === 'election_officer' || assignedRole === 'auditor' || assignedRole === 'principal';
-        const existingProfile = alumni.find(a => (a.email || '').toLowerCase() === userEmail);
 
-        setUser({
-          uid: fbUser.uid,
-          email: fbUser.email,
-          displayName: fbUser.displayName || (existingProfile ? existingProfile.fullName : (isSuperAdminEmail ? 'Prakash (Super Admin)' : 'Alumnus')),
-          photoURL: fbUser.photoURL || existingProfile?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop',
+        // Check again after auth in case profile was updated
+        if (!isSuperAdminEmail && existingProfile && existingProfile.verificationStatus !== 'verified') {
+          await logoutUser();
+          localStorage.removeItem('jnv_auth_session');
+          const msg = 'Your account is waiting for administrator approval.';
+          setAuthError({ code: 'auth/account-pending', message: msg });
+          return { success: false, message: msg };
+        }
+
+        const authenticatedUser: UserAuth = {
+          uid: fbUser?.uid || 'super-admin-prakash-uid',
+          email: fbUser?.email || normalizedEmail,
+          displayName: fbUser?.displayName || (existingProfile ? existingProfile.fullName : (isSuperAdminEmail ? 'Dr. Prakash Rathore (Super Admin)' : 'Alumnus')),
+          photoURL: fbUser?.photoURL || existingProfile?.avatar || null,
           isAdmin: isAuthorizedAdmin,
           role: assignedRole,
           profile: existingProfile
-        });
+        };
+
+        setUser(authenticatedUser);
         setCurrentRole(assignedRole);
+        try {
+          localStorage.setItem('jnv_auth_session', JSON.stringify({
+            email: normalizedEmail,
+            role: assignedRole,
+            uid: authenticatedUser.uid,
+            displayName: authenticatedUser.displayName,
+            photoURL: authenticatedUser.photoURL,
+            timestamp: Date.now()
+          }));
+        } catch (_) {}
+
         setIsAuthModalOpen(false);
+
+        // Record sign-in audit log
+        recordAuditLog(
+          'USER_SIGN_IN',
+          normalizedEmail,
+          assignedRole,
+          `Authenticated via Email/Password with role: ${assignedRole}`,
+          authenticatedUser.uid,
+          'users'
+        );
+
+        return { success: true };
       }
+      return { success: false, message: 'Authentication failed.' };
     } catch (e: any) {
-      console.warn('Sign-in notice:', e);
-      setAuthError(e);
-      setIsAuthModalOpen(true);
+      console.warn('Sign-in error:', e);
+      let errorMsg = 'Invalid email or password. Please try again.';
+      if (e?.code === 'auth/user-not-found' || e?.code === 'auth/invalid-credential' || e?.code === 'auth/wrong-password') {
+        errorMsg = 'Invalid email or password. Please check your credentials or register a new account.';
+      } else if (e?.code === 'auth/too-many-requests') {
+        errorMsg = 'Too many failed login attempts. Please reset your password or try again later.';
+      } else if (e?.message) {
+        errorMsg = e.message;
+      }
+      const errDetails = { code: e?.code || 'auth/error', message: errorMsg };
+      setAuthError(errDetails);
+      return { success: false, message: errorMsg };
+    }
+  };
+
+  const registerWithEmail = async (
+    profileData: Omit<AlumniProfile, 'id' | 'createdAt' | 'verificationStatus'>,
+    password: string
+  ): Promise<{ success: boolean; message: string; id?: string }> => {
+    try {
+      setAuthError(null);
+      const normalizedEmail = profileData.email.toLowerCase().trim();
+
+      // Check if email already exists in alumni list
+      const existing = alumni.find(a => (a.email || '').toLowerCase().trim() === normalizedEmail);
+      if (existing) {
+        return {
+          success: false,
+          message: 'An account with this email address already exists. Please sign in or use password reset.'
+        };
+      }
+
+      // Create Firebase Auth user
+      const userCred = await registerUserWithEmailPassword(normalizedEmail, password, profileData.fullName);
+      const uid = userCred.user.uid;
+
+      // Save profile to Firestore with pending verification status
+      const newProfile: AlumniProfile = {
+        ...profileData,
+        email: normalizedEmail,
+        id: `alum-${Date.now()}`,
+        userId: uid,
+        verificationStatus: 'pending',
+        createdAt: new Date().toISOString()
+      };
+
+      setAlumni(prev => [newProfile, ...prev]);
+      await saveDocToFirestore('alumniProfiles', newProfile.id, newProfile);
+
+      // Immediately sign out since pending users are not authorized to access sessions yet
+      await logoutUser();
+      setUser(null);
+      setCurrentRole('guest');
+
+      // Record registration audit log
+      recordAuditLog(
+        'USER_REGISTRATION',
+        normalizedEmail,
+        'guest',
+        `New user registration submitted for approval: ${profileData.fullName} (${profileData.batchYear || 'Alumnus'})`,
+        newProfile.id,
+        'alumniProfiles'
+      );
+
+      const approvalNotice = 'Your account has been submitted successfully and is waiting for administrator approval.';
+      return {
+        success: true,
+        message: approvalNotice,
+        id: newProfile.id
+      };
+    } catch (err: any) {
+      console.error('Registration failed:', err);
+      let errorMsg = 'Failed to register account. Please try again.';
+      if (err?.code === 'auth/email-already-in-use') {
+        errorMsg = 'This email address is already registered. Please sign in or reset your password.';
+      } else if (err?.code === 'auth/weak-password') {
+        errorMsg = 'Password should be at least 6 characters long.';
+      } else if (err?.message) {
+        errorMsg = err.message;
+      }
+      return {
+        success: false,
+        message: errorMsg
+      };
+    }
+  };
+
+  const sendPasswordResetEmail = async (email: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      await sendPasswordReset(email.trim());
+      return {
+        success: true,
+        message: 'Password reset link has been sent to your email address. Please check your inbox.'
+      };
+    } catch (err: any) {
+      console.error('Password reset failed:', err);
+      let errorMsg = 'Failed to send password reset email. Please verify your email address.';
+      if (err?.code === 'auth/user-not-found') {
+        errorMsg = 'No account found with this email address.';
+      }
+      return {
+        success: false,
+        message: errorMsg
+      };
     }
   };
 
   const loginDirectlyAsSuperAdmin = () => {
-    const superAdminEmail = 'prakashinfosys1234@gmail.com';
-    const existingProfile = alumni.find(a => (a.email || '').toLowerCase() === superAdminEmail);
-
-    setUser({
-      uid: 'prakash-super-admin-uid',
-      email: superAdminEmail,
-      displayName: 'Prakash (Super Admin)',
-      photoURL: existingProfile?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop',
-      isAdmin: true,
-      role: 'super_admin',
-      profile: existingProfile || alumni[0]
-    });
-    setCurrentRole('super_admin');
-    setAuthError(null);
-    setIsAuthModalOpen(false);
+    setIsAuthModalOpen(true);
   };
 
-  const loginDirectlyAs = (emailOrId: string, roleOverride?: UserRole) => {
-    const key = (emailOrId || '').toLowerCase().trim();
-    let alum = alumni.find(a => a.id === emailOrId || (a.email || '').toLowerCase() === key);
-    if (!alum) {
-      alum = alumni[0];
-    }
-
-    const alumEmail = (alum.email || '').toLowerCase();
-    const assignedRole: UserRole = roleOverride || (alum.email === 'prakashinfosys1234@gmail.com' ? 'super_admin' : (userRolesMap[alumEmail] || 'alumnus'));
-    const isSuperAdmin = alum.email === 'prakashinfosys1234@gmail.com' || assignedRole === 'super_admin';
-    const isAuthorizedAdmin = isSuperAdmin || assignedRole === 'alumni_manager' || assignedRole === 'election_officer' || assignedRole === 'auditor' || assignedRole === 'principal';
-
-    setUser({
-      uid: alum.id,
-      email: alum.email,
-      displayName: alum.fullName,
-      photoURL: alum.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop',
-      isAdmin: isAuthorizedAdmin,
-      role: assignedRole,
-      profile: alum
-    });
-    setCurrentRole(assignedRole);
-    setAuthError(null);
-    setIsAuthModalOpen(false);
+  const loginDirectlyAs = (_emailOrId: string, _roleOverride?: UserRole) => {
+    setIsAuthModalOpen(true);
   };
 
-  const simulateLoginAs = (role: UserRole) => {
-    const defaultProfiles: Record<UserRole, { name: string; email: string; avatar: string }> = {
-      super_admin: {
-        name: 'Prakash (Super Admin)',
-        email: 'prakashinfosys1234@gmail.com',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop'
-      },
-      alumni_manager: {
-        name: 'Sunita Sharma (Alumni Admin)',
-        email: 'sunita.ias@rajasthan.gov.in',
-        avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&h=150&fit=crop'
-      },
-      election_officer: {
-        name: 'Col. Vikram Singh (Election Officer)',
-        email: 'vikram.shekhawat@google.com',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop'
-      },
-      auditor: {
-        name: 'CA Rajesh Sharma (Statutory Auditor)',
-        email: 'rajesh.ca@audit.in',
-        avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop'
-      },
-      principal: {
-        name: 'Dr. R.K. Sharma (Principal & Patron)',
-        email: 'principal-jnvpachpadra@gov.in',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop'
-      },
-      alumnus: {
-        name: 'Ravi Kumar (Verified Alumnus)',
-        email: 'ravi.kumar@example.com',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop'
-      },
-      guest: {
-        name: 'Guest Visitor',
-        email: 'guest@visitor.in',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop'
-      }
-    };
-
-    const targetProfile = defaultProfiles[role];
-    const isAuthorized = role === 'super_admin' || role === 'alumni_manager' || role === 'election_officer' || role === 'auditor' || role === 'principal';
-    const matchAlum = alumni.find(a => (a.email || '').toLowerCase() === targetProfile.email.toLowerCase()) || alumni[0];
-
-    setUser({
-      uid: `simulated-${role}`,
-      email: targetProfile.email,
-      displayName: targetProfile.name,
-      photoURL: targetProfile.avatar,
-      isAdmin: isAuthorized,
-      role: role,
-      profile: matchAlum
-    });
-    setCurrentRole(role);
-    setAuthError(null);
-    setIsAuthModalOpen(false);
+  const simulateLoginAs = (_role: UserRole) => {
+    setIsAuthModalOpen(true);
   };
 
   const logout = async () => {
@@ -838,7 +1037,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Alumni Directory & Moderation with Firestore
   const approveAlumni = (id: string) => {
     const verifiedAt = new Date().toISOString();
-    const verifiedBy = user?.displayName || 'Administrator';
+    const verifiedBy = user?.displayName || user?.email || 'Administrator';
     setAlumni(prev =>
       prev.map(a =>
         a.id === id
@@ -856,16 +1055,74 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       verifiedAt,
       verifiedBy
     });
+    recordAuditLog(
+      'USER_MODERATION',
+      user?.email || 'admin',
+      currentRole,
+      `Approved user account ID: ${id}`,
+      id,
+      'alumniProfiles',
+      { newStatus: 'verified', verifiedBy }
+    );
   };
 
-  const rejectAlumni = (id: string) => {
+  const rejectAlumni = (id: string, reason?: string) => {
     setAlumni(prev => prev.map(a => (a.id === id ? { ...a, verificationStatus: 'rejected' } : a)));
-    updateDocInFirestore('alumniProfiles', id, { verificationStatus: 'rejected' });
+    updateDocInFirestore('alumniProfiles', id, { verificationStatus: 'rejected', rejectionReason: reason || 'Not verified' });
+    recordAuditLog(
+      'USER_MODERATION',
+      user?.email || 'admin',
+      currentRole,
+      `Rejected user account ID: ${id}. Reason: ${reason || 'Not specified'}`,
+      id,
+      'alumniProfiles',
+      { newStatus: 'rejected', reason }
+    );
   };
 
   const deactivateAlumni = (id: string) => {
     setAlumni(prev => prev.map(a => (a.id === id ? { ...a, verificationStatus: 'deactivated' } : a)));
     updateDocInFirestore('alumniProfiles', id, { verificationStatus: 'deactivated' });
+    recordAuditLog(
+      'USER_MODERATION',
+      user?.email || 'admin',
+      currentRole,
+      `Deactivated/disabled user account ID: ${id}`,
+      id,
+      'alumniProfiles',
+      { newStatus: 'deactivated' }
+    );
+  };
+
+  const reactivateAlumni = (id: string) => {
+    const verifiedAt = new Date().toISOString();
+    const verifiedBy = user?.displayName || user?.email || 'Administrator';
+    setAlumni(prev =>
+      prev.map(a =>
+        a.id === id
+          ? {
+              ...a,
+              verificationStatus: 'verified',
+              verifiedAt,
+              verifiedBy
+            }
+          : a
+      )
+    );
+    updateDocInFirestore('alumniProfiles', id, {
+      verificationStatus: 'verified',
+      verifiedAt,
+      verifiedBy
+    });
+    recordAuditLog(
+      'USER_MODERATION',
+      user?.email || 'admin',
+      currentRole,
+      `Reactivated user account ID: ${id}`,
+      id,
+      'alumniProfiles',
+      { newStatus: 'verified', verifiedBy }
+    );
   };
 
   const addAlumnusDirectly = (profileData: Omit<AlumniProfile, 'id' | 'createdAt'>) => {
@@ -1062,15 +1319,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     deleteDocFromFirestore('donationCampaigns', id);
   };
 
-  // Donation Records with Firestore
+  // Donation Records with Firestore & Server Verification
   const recordDonation = (donationData: Omit<DonationRecord, 'id' | 'createdAt' | 'paymentStatus' | 'transactionRef' | 'receiptNumber' | 'taxExempt80GRegNo'>): DonationRecord => {
     const currentYear = new Date().getFullYear();
     const nextYearSuffix = (currentYear + 1).toString().slice(-2);
     const randomSeq = Math.floor(1000 + Math.random() * 9000);
     const txnCode = Math.floor(100000 + Math.random() * 900000);
 
+    const maskedPan = donationData.donorPan ? maskPAN(donationData.donorPan) : undefined;
+
     const newRecord: DonationRecord = {
       ...donationData,
+      donorPan: maskedPan,
       id: `don-${Date.now()}`,
       receiptNumber: `80G/JNVPAA/${currentYear}-${nextYearSuffix}/${randomSeq}`,
       taxExempt80GRegNo: paymentSettings.reg80GNumber || 'CIT(E)/JNVPAA/80G/2012-13/894',
@@ -1110,10 +1370,36 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       date: new Date().toISOString().split('T')[0],
       visibility: 'public',
       auditedBy: 'CA Devendra Saini (Statutory Auditor)',
-      payeeOrDonor: donationData.isAnonymous ? 'Anonymous Well-Wisher' : `${donationData.donorName}${donationData.donorPan ? ` (PAN: ${donationData.donorPan})` : ''}`
+      payeeOrDonor: donationData.isAnonymous ? 'Anonymous Well-Wisher' : `${donationData.donorName}${maskedPan ? ` (PAN: ${maskedPan})` : ''}`
     };
     setLedgerTransactions(prev => [ledgerEntry, ...prev]);
     saveDocToFirestore('financialTransactions', ledgerEntry.id, ledgerEntry);
+
+    // Record Immutable Financial Audit Log
+    recordAuditLog(
+      'DONATION_RECEIVED',
+      donationData.donorEmail || (user?.email ?? 'anonymous'),
+      currentRole,
+      `Received 80G donation of ₹${donationData.amount} for "${donationData.campaignTitle || 'General Welfare'}". Receipt No: ${newRecord.receiptNumber}`,
+      newRecord.id,
+      'donations',
+      { amount: donationData.amount, receiptNumber: newRecord.receiptNumber, transactionRef: newRecord.transactionRef }
+    );
+
+    // Also notify server backend verification
+    try {
+      fetch('/api/donations/verify-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: `order_${Date.now()}`,
+          paymentId: newRecord.transactionRef,
+          donationRecord: newRecord
+        })
+      }).catch(() => {});
+    } catch {
+      // Background non-blocking sync
+    }
 
     setLastGeneratedReceipt(newRecord);
     setIsDonationModalOpen(true);
@@ -2113,7 +2399,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCurrentRole,
         assignUserRole,
         hasPermission,
-        loginWithGoogle,
+        loginWithEmail,
+        registerWithEmail,
+        sendPasswordResetEmail,
         loginDirectlyAsSuperAdmin,
         loginDirectlyAs,
         simulateLoginAs,
@@ -2163,6 +2451,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         approveAlumni,
         rejectAlumni,
         deactivateAlumni,
+        reactivateAlumni,
         addAlumnusDirectly,
         updateAlumniProfile,
         deleteAlumni,

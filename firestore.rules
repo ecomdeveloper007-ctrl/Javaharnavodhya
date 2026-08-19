@@ -3,224 +3,310 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // Core Authentication & Role Validation Helpers
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isAdmin() {
+    function isSuperAdmin() {
       return isSignedIn() && (
         request.auth.token.email == 'prakashinfosys1234@gmail.com' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        exists(/databases/$(database)/documents/user_roles/$(request.auth.uid))
+        (exists(/databases/$(database)/documents/user_roles/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.role == 'super_admin') ||
+        (exists(/databases/$(database)/documents/user_roles/current_map) &&
+          get(/databases/$(database)/documents/user_roles/current_map).data[request.auth.token.email] == 'super_admin')
       );
     }
 
-    // Default catch-all
-    match /{document=**} {
-      allow read: if true;
-      allow write: if isSignedIn();
+    function isAdmin() {
+      return isSuperAdmin() || (
+        isSignedIn() && (
+          (exists(/databases/$(database)/documents/user_roles/$(request.auth.uid)) &&
+            get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.role in ['admin', 'super_admin', 'principal']) ||
+          (exists(/databases/$(database)/documents/user_roles/current_map) &&
+            get(/databases/$(database)/documents/user_roles/current_map).data[request.auth.token.email] in ['admin', 'super_admin', 'principal'])
+        )
+      );
     }
 
-    // Alumni Profiles
+    function isAlumniManager() {
+      return isAdmin() || (
+        isSignedIn() && (
+          (exists(/databases/$(database)/documents/user_roles/$(request.auth.uid)) &&
+            get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.role in ['alumni_manager', 'admin', 'super_admin']) ||
+          (exists(/databases/$(database)/documents/user_roles/current_map) &&
+            get(/databases/$(database)/documents/user_roles/current_map).data[request.auth.token.email] in ['alumni_manager', 'admin', 'super_admin'])
+        )
+      );
+    }
+
+    function isElectionOfficer() {
+      return isAdmin() || (
+        isSignedIn() && (
+          (exists(/databases/$(database)/documents/user_roles/$(request.auth.uid)) &&
+            get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.role in ['election_officer', 'admin', 'super_admin']) ||
+          (exists(/databases/$(database)/documents/user_roles/current_map) &&
+            get(/databases/$(database)/documents/user_roles/current_map).data[request.auth.token.email] in ['election_officer', 'admin', 'super_admin'])
+        )
+      );
+    }
+
+    function isAuditor() {
+      return isAdmin() || (
+        isSignedIn() && (
+          (exists(/databases/$(database)/documents/user_roles/$(request.auth.uid)) &&
+            get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.role in ['auditor', 'admin', 'super_admin']) ||
+          (exists(/databases/$(database)/documents/user_roles/current_map) &&
+            get(/databases/$(database)/documents/user_roles/current_map).data[request.auth.token.email] in ['auditor', 'admin', 'super_admin'])
+        )
+      );
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && (
+        isSuperAdmin() ||
+        (exists(/databases/$(database)/documents/alumni/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/alumni/$(request.auth.uid)).data.verificationStatus == 'verified') ||
+        (exists(/databases/$(database)/documents/alumniProfiles/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/alumniProfiles/$(request.auth.uid)).data.verificationStatus == 'verified')
+      );
+    }
+
+    // 1. User Roles & RBAC - Strict Super Admin Authority
+    match /user_roles/{roleId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == roleId ||
+        request.auth.token.email == roleId ||
+        isAdmin() ||
+        isAuditor()
+      );
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    match /admins/{adminId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    // 2. Audit Logs - Read by Admins/Auditors, Write on Action, Strictly Immutable (No updates or deletes)
+    match /auditLogs/{logId} {
+      allow read: if isAdmin() || isAuditor();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+    match /audit_logs/{logId} {
+      allow read: if isAdmin() || isAuditor();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    // 3. Donations - Secure Flow: Anyone can create pending order, verified only by server/admin
+    match /donations/{donationId} {
+      // Sensitive donor details (PAN, phone, amount breakdown) only visible to Admin, Auditor or the donor themselves
+      allow read: if isAdmin() || isAuditor() || (
+        isSignedIn() && (
+          resource.data.donorEmail == request.auth.token.email ||
+          resource.data.userId == request.auth.uid
+        )
+      );
+      // Frontend can only initiate pending donation orders (cannot fake SUCCESS/VERIFIED)
+      allow create: if (
+        request.resource.data.paymentStatus in ['PENDING', 'PAYMENT_PENDING'] &&
+        (!('compliance80GStatus' in request.resource.data) || request.resource.data.compliance80GStatus in ['NOT_APPLICABLE', '80G_ELIGIBLE', 'PENDING_VERIFICATION'])
+      );
+      // Only authorized Admin or Auditor can verify and update donation/receipt compliance status
+      allow update: if isAdmin() || isAuditor();
+      allow delete: if isSuperAdmin();
+    }
+
+    // 4. Donation Campaigns
+    match /donationCampaigns/{campaignId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /donation_campaigns/{campaignId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 5. Financial Ledger & Reports
+    match /financialTransactions/{txId} {
+      allow read: if true;
+      allow create, update: if isAdmin() || isAuditor();
+      allow delete: if isSuperAdmin();
+    }
+    match /financial_transactions/{txId} {
+      allow read: if true;
+      allow create, update: if isAdmin() || isAuditor();
+      allow delete: if isSuperAdmin();
+    }
+    match /financial_reports/{reportId} {
+      allow read: if true;
+      allow write: if isAdmin() || isAuditor();
+    }
+
+    // 6. Payment Settings (Bank, UPI QR, 80G Certificate details)
+    match /payment_settings/{settingId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || isAdmin();
+    }
+
+    // 7. Alumni Profiles & Directory
     match /alumniProfiles/{profileId} {
       allow read: if true;
-      allow create, update: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isAlumniManager() || (
+        isSignedIn() && (
+          resource.data.email == request.auth.token.email ||
+          resource.data.userId == request.auth.uid ||
+          profileId == request.auth.uid
+        )
+      );
       allow delete: if isAdmin();
     }
     match /alumni/{profileId} {
       allow read: if true;
-      allow create, update: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isAlumniManager() || (
+        isSignedIn() && (
+          resource.data.email == request.auth.token.email ||
+          resource.data.userId == request.auth.uid ||
+          profileId == request.auth.uid
+        )
+      );
       allow delete: if isAdmin();
     }
 
-    // Batches
+    // 8. Batches
     match /batches/{batchId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isAlumniManager();
     }
 
-    // Businesses
+    // 9. Businesses & Job Postings
     match /businesses/{businessId} {
       allow read: if true;
-      allow create, update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow create: if isVerifiedUser();
+      allow update: if isAlumniManager() || (
+        isSignedIn() && resource.data.ownerEmail == request.auth.token.email
+      );
+      allow delete: if isAlumniManager();
     }
 
-    // Jobs
     match /jobs/{jobId} {
       allow read: if true;
-      allow create, update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow create: if isVerifiedUser();
+      allow update: if isAlumniManager() || (
+        isSignedIn() && resource.data.postedByEmail == request.auth.token.email
+      );
+      allow delete: if isAlumniManager();
     }
 
-    // Welfare Cases
+    // 10. Welfare Cases
     match /welfareCases/{caseId} {
       allow read: if true;
-      allow create, update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow create: if isVerifiedUser();
+      allow update, delete: if isAlumniManager();
     }
     match /welfare_cases/{caseId} {
       allow read: if true;
-      allow create, update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow create: if isVerifiedUser();
+      allow update, delete: if isAlumniManager();
     }
 
-    // Donation Campaigns
-    match /donationCampaigns/{campaignId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-    match /donation_campaigns/{campaignId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-
-    // Donations & 80G Receipts
-    match /donations/{donationId} {
-      allow read: if true;
-      allow create: if true;
-      allow update, delete: if isSignedIn();
-    }
-
-    // Payment Settings (UPI, QR Code, Bank Account & 80G Reg)
-    match /payment_settings/{settingId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-
-    // School Settings (Principal, metrics, announcements)
+    // 11. School Website CMS (Notices, Faculty, Gallery, School Settings)
     match /school_settings/{settingId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
-
-    // School Notices & Circulars
     match /notices/{noticeId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
-
-    // Faculty & Staff Directory
     match /faculty/{facultyId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
-
-    // Photo Gallery
     match /gallery/{galleryId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
-
-    // Admission Enquiries
-    match /admission_enquiries/{enquiryId} {
-      allow read: if true;
-      allow create: if true;
-      allow update, delete: if isSignedIn();
-    }
-
-    // Board Toppers
     match /toppers/{topperId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
-
-    // VMC Members
     match /vmc_members/{memberId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
-
-    // Houses
     match /houses/{houseId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
-    // Blood Donors
-    match /blood_donors/{donorId} {
-      allow read: if true;
-      allow create, update: if isSignedIn();
-      allow delete: if isSignedIn();
-    }
-
-    // Blood Requests (Emergency SOS)
-    match /blood_requests/{requestId} {
-      allow read: if true;
+    // 12. Admission Enquiries
+    match /admission_enquiries/{enquiryId} {
+      allow read: if isAdmin();
       allow create: if true;
-      allow update, delete: if isSignedIn();
-    }
-
-    // Financial Transactions Ledger & Reports
-    match /financialTransactions/{txId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-    match /financial_transactions/{txId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-    match /financial_reports/{reportId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-
-    // Events & RSVPs
-    match /events/{eventId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-    match /event_rsvps/{rsvpId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    // Elections, Nominations & Votes
-    match /elections/{electionId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-    match /nominations/{nominationId} {
-      allow read: if true;
-      allow create, update: if isSignedIn();
-      allow delete: if isSignedIn();
-    }
-    match /votes/{voteId} {
-      allow read: if true;
-      allow create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
 
-    // Memories Archive
+    // 13. Blood Donors & Requests
+    match /blood_donors/{donorId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.email == request.auth.token.email);
+    }
+    match /blood_requests/{requestId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.contactEmail == request.auth.token.email);
+    }
+
+    // 14. Events & RSVPs
+    match /events/{eventId} {
+      allow read: if true;
+      allow write: if isAlumniManager();
+    }
+    match /event_rsvps/{rsvpId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // 15. Elections, Nominations & Votes
+    match /elections/{electionId} {
+      allow read: if true;
+      allow write: if isElectionOfficer();
+    }
+    match /nominations/{nominationId} {
+      allow read: if true;
+      allow create: if isVerifiedUser();
+      allow update: if isElectionOfficer() || (
+        isSignedIn() && resource.data.candidateEmail == request.auth.token.email
+      );
+      allow delete: if isElectionOfficer();
+    }
+    match /votes/{voteId} {
+      allow read: if isElectionOfficer();
+      allow create: if isVerifiedUser() && request.resource.data.voterEmail == request.auth.token.email;
+      allow update, delete: if false;
+    }
+
+    // 16. Memories & Achievements
     match /memories/{memoryId} {
       allow read: if true;
-      allow create, update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow create: if isVerifiedUser();
+      allow update, delete: if isAlumniManager() || (
+        isSignedIn() && resource.data.submittedByEmail == request.auth.token.email
+      );
     }
-
-    // Achievements & Wall of Fame
     match /achievements/{achievementId} {
       allow read: if true;
-      allow create, update: if isSignedIn();
-      allow delete: if isSignedIn();
-    }
-
-    // User Roles & RBAC
-    match /user_roles/{roleId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-
-    // Audit Logs
-    match /auditLogs/{logId} {
-      allow read: if true;
-      allow create: if true;
-      allow update, delete: if isSignedIn();
-    }
-    match /audit_logs/{logId} {
-      allow read: if true;
-      allow create: if true;
-      allow update, delete: if isSignedIn();
+      allow create: if isVerifiedUser();
+      allow update, delete: if isAlumniManager() || (
+        isSignedIn() && resource.data.submittedByEmail == request.auth.token.email
+      );
     }
   }
 }
+

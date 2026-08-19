@@ -1,5 +1,12 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as fbSignOut } from 'firebase/auth';
+import {
+  getAuth,
+  signInWithEmailAndPassword as fbSignInWithEmailAndPassword,
+  createUserWithEmailAndPassword as fbCreateUserWithEmailAndPassword,
+  sendPasswordResetEmail as fbSendPasswordResetEmail,
+  updateProfile as fbUpdateProfile,
+  signOut as fbSignOut
+} from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -7,10 +14,6 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({
-  prompt: 'select_account'
-});
 
 export enum OperationType {
   CREATE = 'create',
@@ -79,34 +82,25 @@ setTimeout(() => {
 export interface AuthErrorDetails {
   code: string;
   message: string;
-  isUnauthorizedDomain: boolean;
-  currentDomain: string;
 }
 
-export const signInWithGoogle = async () => {
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    return result.user;
-  } catch (error: any) {
-    const errorCode = error?.code || '';
-    const errorMessage = error?.message || String(error);
-    const isUnauthorizedDomain =
-      errorCode === 'auth/unauthorized-domain' ||
-      errorMessage.includes('auth/unauthorized-domain') ||
-      errorMessage.includes('unauthorized-domain');
+export const loginWithEmailPassword = async (email: string, password: string) => {
+  return await fbSignInWithEmailAndPassword(auth, email.trim(), password);
+};
 
-    const authError: AuthErrorDetails = {
-      code: errorCode,
-      message: errorMessage,
-      isUnauthorizedDomain,
-      currentDomain: typeof window !== 'undefined' ? window.location.hostname : 'localhost'
-    };
-
-    console.warn("Google sign-in attempt notice:", authError);
-    throw authError;
+export const registerUserWithEmailPassword = async (email: string, password: string, displayName?: string) => {
+  const userCredential = await fbCreateUserWithEmailAndPassword(auth, email.trim(), password);
+  if (displayName && userCredential.user) {
+    await fbUpdateProfile(userCredential.user, { displayName });
   }
+  return userCredential;
+};
+
+export const sendPasswordReset = async (email: string) => {
+  return await fbSendPasswordResetEmail(auth, email.trim());
 };
 
 export const logoutUser = async () => {
   return await fbSignOut(auth);
 };
+

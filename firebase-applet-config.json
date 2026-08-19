@@ -1,12 +1,12 @@
 {
-  "projectId": "gen-lang-client-0235220289",
-  "appId": "1:699070831353:web:3315bf58d1cc1f4f6b6028",
-  "apiKey": "AIzaSyB7eMkSuUBXfw_oQhjcjDPQpn52yGAeHRk",
-  "authDomain": "gen-lang-client-0235220289.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-jnvpachpadraalum-d6edb910-7721-437b-9977-47e08f8662d9",
-  "storageBucket": "gen-lang-client-0235220289.firebasestorage.app",
-  "messagingSenderId": "699070831353",
+  "projectId": "jawahar-navodaya",
+  "appId": "1:782804966696:web:6813412d219efe9bb4c41d",
+  "apiKey": "AIzaSyATPdojIQN5612A5u0YRqni0FaYz6-jqzI",
+  "authDomain": "jawahar-navodaya.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-jnvpachpadraalum-947043b1-af6b-44be-832b-1e342d9b71f7",
+  "storageBucket": "jawahar-navodaya.firebasestorage.app",
+  "messagingSenderId": "782804966696",
   "measurementId": "",
-  "oAuthClientId": "699070831353-raqsba08m0lcelgosep1ej5b7262s8oc.apps.googleusercontent.com",
+  "oAuthClientId": "782804966696-qmem5m3csp6om7nds4mebv9habtb8b1b.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }

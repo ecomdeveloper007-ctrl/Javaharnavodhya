@@ -130,21 +130,23 @@ export const RegistrationModal: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const res = await registerWithEmail({
-        email: trimmedEmail,
-        password,
-        fullName: trimmedName,
-        batchYear,
-        house,
-        profession: profession.trim() || 'Professional',
-        company: company.trim(),
-        city: city.trim() || 'Jaipur',
-        state: state.trim() || 'Rajasthan',
-        phone: trimmedPhone,
-        bloodGroup,
-        linkedinUrl: linkedinUrl.trim(),
-        isMentorAvailable
-      });
+      const res = await registerWithEmail(
+        {
+          email: trimmedEmail,
+          fullName: trimmedName,
+          batchYear,
+          house,
+          profession: profession.trim() || 'Professional',
+          company: company.trim(),
+          city: city.trim() || 'Jaipur',
+          state: state.trim() || 'Rajasthan',
+          phone: trimmedPhone,
+          bloodGroup,
+          linkedinUrl: linkedinUrl.trim(),
+          isMentorAvailable
+        },
+        password
+      );
 
       if (res.success) {
         setSubmittedData({

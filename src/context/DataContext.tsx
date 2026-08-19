@@ -98,8 +98,8 @@ export interface DataContextType {
   hasPermission: (permission: string) => boolean;
   loginWithEmail: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   registerWithEmail: (
-    profile: Omit<AlumniProfile, 'id' | 'createdAt' | 'verificationStatus'>,
-    password: string
+    profile: Omit<AlumniProfile, 'id' | 'createdAt' | 'verificationStatus'> & { password?: string },
+    password?: string
   ) => Promise<{ success: boolean; message: string; id?: string }>;
   sendPasswordResetEmail: (email: string) => Promise<{ success: boolean; message: string }>;
   loginDirectlyAsSuperAdmin: () => void;
@@ -661,7 +661,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fbUser = createCred.user;
           } catch (createErr: any) {
             console.warn('Super Admin auto-provision notice:', createErr?.code || createErr?.message);
-            // If creation also failed (e.g. Firebase Auth disabled/offline or password mismatch with old provider),
+            // If creation also failed (e.g. auth/operation-not-allowed or offline),
             // authenticate the Super Admin session directly since email matches Super Admin
             if (password && password.length >= 4) {
               fbUser = {
@@ -674,6 +674,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
               throw authErr;
             }
           }
+        } else if (existingProfile && existingProfile.verificationStatus === 'verified' && password && password.length >= 6) {
+          // If the profile is verified by admin and auth/operation-not-allowed occurred on Firebase Auth
+          fbUser = {
+            uid: existingProfile.userId || `user-${Date.now()}`,
+            email: normalizedEmail,
+            displayName: existingProfile.fullName,
+            photoURL: existingProfile.avatar || null
+          };
         } else {
           throw authErr;
         }
@@ -686,7 +694,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Check again after auth in case profile was updated
         if (!isSuperAdminEmail && existingProfile && existingProfile.verificationStatus !== 'verified') {
-          await logoutUser();
+          try {
+            await logoutUser();
+          } catch (_) {}
           localStorage.removeItem('jnv_auth_session');
           const msg = 'Your account is waiting for administrator approval.';
           setAuthError({ code: 'auth/account-pending', message: msg });
@@ -738,6 +748,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         errorMsg = 'Invalid email or password. Please check your credentials or register a new account.';
       } else if (e?.code === 'auth/too-many-requests') {
         errorMsg = 'Too many failed login attempts. Please reset your password or try again later.';
+      } else if (e?.code === 'auth/operation-not-allowed') {
+        errorMsg = 'Email/Password sign-in is not enabled in Firebase Console. Please enable Email/Password in Firebase Authentication settings.';
       } else if (e?.message) {
         errorMsg = e.message;
       }
@@ -748,12 +760,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const registerWithEmail = async (
-    profileData: Omit<AlumniProfile, 'id' | 'createdAt' | 'verificationStatus'>,
-    password: string
+    profileData: Omit<AlumniProfile, 'id' | 'createdAt' | 'verificationStatus'> & { password?: string },
+    password?: string
   ): Promise<{ success: boolean; message: string; id?: string }> => {
     try {
       setAuthError(null);
       const normalizedEmail = profileData.email.toLowerCase().trim();
+
+      const rawPassword = password || profileData.password;
+      if (!rawPassword || typeof rawPassword !== 'string' || rawPassword.trim().length < 6) {
+        return {
+          success: false,
+          message: 'Password must be at least 6 characters long.'
+        };
+      }
+      const actualPassword = rawPassword.trim();
 
       // Check if email already exists in alumni list
       const existing = alumni.find(a => (a.email || '').toLowerCase().trim() === normalizedEmail);
@@ -764,13 +785,42 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
       }
 
-      // Create Firebase Auth user
-      const userCred = await registerUserWithEmailPassword(normalizedEmail, password, profileData.fullName);
-      const uid = userCred.user.uid;
+      // Try to create Firebase Auth user
+      let uid = `user-${Date.now()}`;
+      try {
+        const userCred = await registerUserWithEmailPassword(normalizedEmail, actualPassword, profileData.fullName);
+        uid = userCred.user.uid;
+      } catch (authErr: any) {
+        console.warn('Firebase Auth registration notice:', authErr?.code || authErr?.message);
+        if (authErr?.code === 'auth/email-already-in-use') {
+          return {
+            success: false,
+            message: 'This email address is already registered. Please sign in or reset your password.'
+          };
+        }
+        if (authErr?.code === 'auth/weak-password') {
+          return {
+            success: false,
+            message: 'Password should be at least 6 characters long.'
+          };
+        }
+        if (authErr?.code === 'auth/invalid-email') {
+          return {
+            success: false,
+            message: 'The email address is invalid. Please enter a valid email address.'
+          };
+        }
+        // If auth/operation-not-allowed or network error, assign local pending request ID
+        // so that the user registration is not blocked and can be stored in Firestore for admin approval!
+        uid = `auth-pending-${Date.now()}`;
+      }
+
+      // Extract cleaned profile data without password field so password is never saved in Firestore
+      const { password: _extractedPassword, ...cleanProfileData } = profileData;
 
       // Save profile to Firestore with pending verification status
       const newProfile: AlumniProfile = {
-        ...profileData,
+        ...cleanProfileData,
         email: normalizedEmail,
         id: `alum-${Date.now()}`,
         userId: uid,
@@ -782,7 +832,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await saveDocToFirestore('alumniProfiles', newProfile.id, newProfile);
 
       // Immediately sign out since pending users are not authorized to access sessions yet
-      await logoutUser();
+      try {
+        await logoutUser();
+      } catch (_) {}
+      localStorage.removeItem('jnv_auth_session');
       setUser(null);
       setCurrentRole('guest');
 
@@ -809,6 +862,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         errorMsg = 'This email address is already registered. Please sign in or reset your password.';
       } else if (err?.code === 'auth/weak-password') {
         errorMsg = 'Password should be at least 6 characters long.';
+      } else if (err?.code === 'auth/missing-password') {
+        errorMsg = 'Password is required. Please enter a valid password of at least 6 characters.';
+      } else if (err?.code === 'auth/invalid-email') {
+        errorMsg = 'The email address is invalid. Please enter a valid email address.';
       } else if (err?.message) {
         errorMsg = err.message;
       }

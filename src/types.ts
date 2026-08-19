@@ -562,6 +562,26 @@ export interface SchoolSettings {
   upiId: string;
 }
 
+export interface BannerSlide {
+  id: string;
+  title: string;
+  titleHindi?: string;
+  subtitle: string;
+  subtitleHindi?: string;
+  badgeText?: string;
+  badgeTextHindi?: string;
+  imageUrl: string;
+  ctaText?: string;
+  ctaTextHindi?: string;
+  ctaLink?: string; // Tab identifier like 'admissions', 'alumni', 'events', 'gallery', 'about', or custom URL
+  secondaryCtaText?: string;
+  secondaryCtaTextHindi?: string;
+  secondaryCtaLink?: string;
+  isActive: boolean;
+  order: number;
+  createdAt: string;
+}
+
 export interface CSVImportResult {
   success: boolean;
   importedCount: number;

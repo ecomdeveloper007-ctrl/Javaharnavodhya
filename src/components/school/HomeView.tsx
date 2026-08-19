@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { SEED_TOPPERS } from '../../data/seedData';
 import { ImageWithFallback } from '../common/ImageWithFallback';
+import { HeroBannerSlider } from '../common/HeroBannerSlider';
 
 export const HomeView: React.FC = () => {
   const {
@@ -87,6 +88,11 @@ export const HomeView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Dynamic Interactive Hero Banner Slider */}
+      <section className="w-full shadow-lg" id="home-hero-slider-section">
+        <HeroBannerSlider autoPlayInterval={6000} />
+      </section>
 
       {/* 1. Hero Showcase with Institutional Banner */}
       <section className="relative overflow-hidden bg-white border-b border-slate-200 shadow-xs">

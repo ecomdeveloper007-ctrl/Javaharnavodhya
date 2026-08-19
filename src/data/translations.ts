@@ -138,7 +138,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     businessDirectory: "Alumni Businesses",
     memoriesWall: "Memories & Archive",
     welfareAid: "Alumni Welfare Fund",
-    donationPortal: "Donation & 80G Portal",
+    donationPortal: "Alumni Welfare Fund (80G)",
     bloodDonationPortal: "Blood Lifeline Network",
 
     // Hero Section
@@ -230,8 +230,8 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     careersJobs: "कैरियर एवं रोजगार मंच",
     businessDirectory: "पूर्व छात्र व्यापार डायरेक्टरी",
     memoriesWall: "यादें एवं पुरातन दीर्घा",
-    welfareAid: "पूर्व छात्र कल्याण कोष",
-    donationPortal: "दान एवं 80G पोर्टल",
+    welfareAid: "पूर्व छात्र कल्याण निधि (Alumni Welfare Fund)",
+    donationPortal: "पूर्व छात्र कल्याण निधि (80G)",
     bloodDonationPortal: "रक्तदान जीवनदान नेटवर्क",
 
     // Hero Section

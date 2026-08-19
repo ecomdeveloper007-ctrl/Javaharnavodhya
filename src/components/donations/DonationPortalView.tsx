@@ -32,6 +32,7 @@ export const DonationPortalView: React.FC = () => {
   const {
     donationCampaigns,
     donationRecords,
+    welfareCases,
     recordDonation,
     setIsDonationModalOpen,
     setSelectedCampaignForDonation,
@@ -57,17 +58,31 @@ export const DonationPortalView: React.FC = () => {
   const [quickIsAnonymous, setQuickIsAnonymous] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  // Filtered campaigns
-  const categories = ['All', 'Scholarship', 'Infrastructure', 'Emergency', 'Sports', 'General'];
-  const filteredCampaigns = donationCampaigns.filter(c => {
-    return selectedCategory === 'All' || (c.category && c.category.toLowerCase() === selectedCategory.toLowerCase());
-  });
+  // Filter categories
+  const categories = ['All', 'Emergency Aid', 'Scholarship', 'Infrastructure', 'Sports', 'General'];
 
-  const totalFundsRaised = donationCampaigns.reduce((acc, c) => acc + c.currentAmount, 0);
-  const totalTargetFunds = donationCampaigns.reduce((acc, c) => acc + c.targetAmount, 0);
+  const totalFundsRaised = donationCampaigns.reduce((acc, c) => acc + c.currentAmount, 0) + welfareCases.reduce((acc, w) => acc + w.amountRaised, 0);
+  const totalTargetFunds = donationCampaigns.reduce((acc, c) => acc + c.targetAmount, 0) + welfareCases.reduce((acc, w) => acc + w.amountRequired, 0);
   const totalDonorsCount = donationCampaigns.reduce((acc, c) => acc + c.donorsCount, 0) + donationRecords.length;
 
   const handleOpenDonateModal = (campaign: DonationCampaign) => {
+    setSelectedCampaignForDonation(campaign);
+    setIsDonationModalOpen(true);
+  };
+
+  const handleOpenWelfareDonateModal = (welfareCase: any) => {
+    const campaign: DonationCampaign = {
+      id: `welfare-${welfareCase.id}`,
+      title: `[Alumni Welfare Aid] ${welfareCase.title} (Beneficiary: ${welfareCase.beneficiary})`,
+      description: welfareCase.description,
+      category: 'Emergency Welfare',
+      targetAmount: welfareCase.amountRequired,
+      currentAmount: welfareCase.amountRaised,
+      donorsCount: 15,
+      endDate: '2026-12-31',
+      isActive: true,
+      createdAt: welfareCase.createdAt
+    };
     setSelectedCampaignForDonation(campaign);
     setIsDonationModalOpen(true);
   };
@@ -80,7 +95,7 @@ export const DonationPortalView: React.FC = () => {
     const targetCamp = donationCampaigns.find(c => c.id === quickCampId) || donationCampaigns[0];
 
     setTimeout(() => {
-      const receipt = recordDonation({
+      recordDonation({
         campaignId: targetCamp?.id,
         campaignTitle: targetCamp?.title || 'General Alumni Welfare & Vidyalaya Development Corpus',
         donorName: quickDonorName || 'Generous Navodaya Well-Wisher',
@@ -140,10 +155,12 @@ export const DonationPortalView: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             <div className="lg:col-span-8 space-y-3">
               <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white leading-tight">
-                {isHindi ? 'ज.न.वि. पचपदरा पूर्व छात्र कल्याण एवं दान पोर्टल' : 'JNV Pachpadra Giving & 80G Donation Portal'}
+                {isHindi ? 'पूर्व छात्र कल्याण निधि (Alumni Welfare Fund & 80G)' : 'Alumni Welfare Fund (80G)'}
               </h1>
               <p className="text-sm sm:text-base text-slate-300 max-w-3xl leading-relaxed">
-                Empower rural meritorious students with scholarships, smart digital classrooms, sports excellence programs, and emergency alumni relief. All contributions generate an <strong>instant government-compliant Section 80G Tax Exemption Receipt</strong> with Form 10BE filing eligibility.
+                {isHindi
+                  ? 'छात्रों की छात्रवृत्ति, पूर्व छात्रों एवं परिवारों के लिए आपातकालीन चिकित्सा सहायता, तथा विद्यालय विकास परियोजनाओं हेतु समर्पित कोष। सभी दानों पर 50% आयकर छूट (धारा 80G) व तत्काल डिजिटल रसीद उपलब्ध है।'
+                  : 'Providing emergency medical aid, student scholarships, and school campus development. All contributions are 100% transparent and eligible for Section 80G Tax Exemption (50% Tax Relief) with instant digital receipts.'}
               </p>
             </div>
 
@@ -165,7 +182,7 @@ export const DonationPortalView: React.FC = () => {
                 className="w-full mt-2 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <Heart className="w-4 h-4 fill-slate-950" />
-                <span>Make a Donation & Get 80G Receipt</span>
+                <span>{isHindi ? 'कल्याण निधि में दान करें (80G रसीद)' : 'Contribute to Welfare Fund & Get 80G'}</span>
               </button>
             </div>
           </div>
@@ -173,12 +190,12 @@ export const DonationPortalView: React.FC = () => {
           {/* Quick Metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 border-t border-slate-700/80">
             <div className="bg-slate-800/60 p-4 rounded-2xl border border-slate-700">
-              <span className="text-[11px] text-slate-400 block font-medium">Total Funds Raised</span>
+              <span className="text-[11px] text-slate-400 block font-medium">Total Welfare & School Funds</span>
               <span className="text-xl sm:text-2xl font-black text-amber-400">₹{totalFundsRaised.toLocaleString('en-IN')}</span>
             </div>
             <div className="bg-slate-800/60 p-4 rounded-2xl border border-slate-700">
-              <span className="text-[11px] text-slate-400 block font-medium">Active Giving Campaigns</span>
-              <span className="text-xl sm:text-2xl font-black text-emerald-400">{donationCampaigns.length} Causes</span>
+              <span className="text-[11px] text-slate-400 block font-medium">Active Welfare Causes</span>
+              <span className="text-xl sm:text-2xl font-black text-emerald-400">{welfareCases.length + donationCampaigns.length} Causes</span>
             </div>
             <div className="bg-slate-800/60 p-4 rounded-2xl border border-slate-700">
               <span className="text-[11px] text-slate-400 block font-medium">Generous Donors</span>
@@ -220,64 +237,152 @@ export const DonationPortalView: React.FC = () => {
             </div>
           </div>
 
-          {/* Campaign Cards List */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {filteredCampaigns.map((campaign) => {
-              const pct = Math.min(100, Math.round((campaign.currentAmount / campaign.targetAmount) * 100));
-              return (
-                <div
-                  key={campaign.id}
-                  className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xs hover:shadow-md transition flex flex-col justify-between"
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
-                        {campaign.category}
-                      </span>
-                      <span className="text-[11px] font-bold text-slate-500">
-                        {campaign.donorsCount} Donors
-                      </span>
-                    </div>
-
-                    <h3 className="text-base font-bold text-slate-900 leading-snug">
-                      {campaign.title}
-                    </h3>
-                    <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">
-                      {campaign.description}
-                    </p>
-                  </div>
-
-                  <div className="space-y-3 pt-3 border-t border-slate-100">
-                    {/* Progress Bar */}
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-xs font-semibold">
-                        <span className="text-slate-900 font-bold">
-                          ₹{campaign.currentAmount.toLocaleString('en-IN')}
-                        </span>
-                        <span className="text-slate-500">
-                          Goal: ₹{campaign.targetAmount.toLocaleString('en-IN')} ({pct}%)
-                        </span>
-                      </div>
-                      <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full transition-all duration-500"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => handleOpenDonateModal(campaign)}
-                      className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center space-x-1.5 cursor-pointer"
-                    >
-                      <Receipt className="w-4 h-4 text-amber-400" />
-                      <span>Contribute & Get 80G Receipt</span>
-                    </button>
-                  </div>
+          {/* Emergency Welfare Cases (if All or Emergency Aid selected) */}
+          {(selectedCategory === 'All' || selectedCategory === 'Emergency Aid') && welfareCases.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Heart className="w-4 h-4 text-rose-600 fill-rose-500" />
+                  <h3 className="text-sm font-bold text-slate-900">
+                    {isHindi ? 'आपातकालीन पूर्व छात्र कल्याण व चिकित्सा सहायता' : 'Emergency Alumni Welfare & Medical Cases'}
+                  </h3>
                 </div>
-              );
-            })}
-          </div>
+                <span className="text-[11px] font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                  {welfareCases.length} Active Cases
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {welfareCases.map((w) => {
+                  const pct = Math.min(100, Math.round((w.amountRaised / w.amountRequired) * 100));
+                  return (
+                    <div
+                      key={w.id}
+                      className="bg-white border-2 border-rose-200/70 rounded-3xl p-5 space-y-4 shadow-xs hover:shadow-md transition flex flex-col justify-between"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-800 border border-rose-200">
+                            {w.urgency} Priority
+                          </span>
+                          <span className="text-[11px] font-bold text-emerald-700">
+                            {w.status}
+                          </span>
+                        </div>
+
+                        <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                          {w.title}
+                        </h4>
+                        <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">
+                          {w.description}
+                        </p>
+                        <div className="text-[11px] text-slate-500 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                          Beneficiary: <strong className="text-slate-800">{w.beneficiary}</strong> {w.beneficiaryBatch ? `(Batch ${w.beneficiaryBatch})` : ''}
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 pt-3 border-t border-slate-100">
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs font-semibold">
+                            <span className="text-slate-900 font-bold">
+                              ₹{(w.amountRaised ?? 0).toLocaleString('en-IN')}
+                            </span>
+                            <span className="text-slate-500">
+                              Goal: ₹{(w.amountRequired ?? 0).toLocaleString('en-IN')} ({pct}%)
+                            </span>
+                          </div>
+                          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-rose-500 to-emerald-500 rounded-full transition-all duration-500"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleOpenWelfareDonateModal(w)}
+                          className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center space-x-1.5 cursor-pointer"
+                        >
+                          <Heart className="w-4 h-4 fill-white" />
+                          <span>Support This Case & Get 80G Receipt</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Development & Scholarship Campaigns */}
+          {selectedCategory !== 'Emergency Aid' && (
+            <div className="space-y-4">
+              {selectedCategory === 'All' && (
+                <h3 className="text-sm font-bold text-slate-900">
+                  {isHindi ? 'विद्यार्थी छात्रवृत्ति एवं विद्यालय विकास परियोजनाएं' : 'Student Scholarships & Campus Projects'}
+                </h3>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {donationCampaigns
+                  .filter(c => selectedCategory === 'All' || (c.category && c.category.toLowerCase() === selectedCategory.toLowerCase()))
+                  .map((campaign) => {
+                    const pct = Math.min(100, Math.round((campaign.currentAmount / campaign.targetAmount) * 100));
+                    return (
+                      <div
+                        key={campaign.id}
+                        className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xs hover:shadow-md transition flex flex-col justify-between"
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
+                              {campaign.category}
+                            </span>
+                            <span className="text-[11px] font-bold text-slate-500">
+                              {campaign.donorsCount} Donors
+                            </span>
+                          </div>
+
+                          <h3 className="text-base font-bold text-slate-900 leading-snug">
+                            {campaign.title}
+                          </h3>
+                          <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">
+                            {campaign.description}
+                          </p>
+                        </div>
+
+                        <div className="space-y-3 pt-3 border-t border-slate-100">
+                          {/* Progress Bar */}
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between text-xs font-semibold">
+                              <span className="text-slate-900 font-bold">
+                                ₹{campaign.currentAmount.toLocaleString('en-IN')}
+                              </span>
+                              <span className="text-slate-500">
+                                Goal: ₹{campaign.targetAmount.toLocaleString('en-IN')} ({pct}%)
+                              </span>
+                            </div>
+                            <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full transition-all duration-500"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => handleOpenDonateModal(campaign)}
+                            className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center space-x-1.5 cursor-pointer"
+                          >
+                            <Receipt className="w-4 h-4 text-amber-400" />
+                            <span>Contribute & Get 80G Receipt</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Column: Instant 80G Contribution Card */}

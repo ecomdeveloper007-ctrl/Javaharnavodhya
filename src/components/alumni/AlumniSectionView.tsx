@@ -246,25 +246,13 @@ export const AlumniSectionView: React.FC = () => {
           <button
             onClick={() => setActiveAlumniSubTab('welfare')}
             className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center space-x-2 ${
-              activeAlumniSubTab === 'welfare'
-                ? 'bg-slate-900 text-white font-bold shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <Compass className="w-4 h-4" />
-            <span>Welfare & Giving Back</span>
-          </button>
-
-          <button
-            onClick={() => setActiveAlumniSubTab('donations')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center space-x-2 ${
-              activeAlumniSubTab === 'donations'
+              activeAlumniSubTab === 'welfare' || activeAlumniSubTab === 'donations'
                 ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
-                : 'text-amber-700 bg-amber-50/70 hover:bg-amber-100 hover:text-amber-900 border border-amber-200'
+                : 'text-amber-900 bg-amber-50/70 hover:bg-amber-100 hover:text-amber-950 border border-amber-200'
             }`}
           >
             <Receipt className="w-4 h-4 text-amber-600" />
-            <span>80G Donation Portal</span>
+            <span>Alumni Welfare Fund (80G)</span>
           </button>
 
           <button
@@ -663,53 +651,8 @@ export const AlumniSectionView: React.FC = () => {
         </div>
       )}
 
-      {/* SUBTAB 6: WELFARE & GIVING BACK */}
-      {activeAlumniSubTab === 'welfare' && (
-        <div className="space-y-6">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-2 shadow-xs">
-            <h2 className="text-lg font-bold text-slate-900">Alumni Welfare & Emergency Assistance Fund</h2>
-            <p className="text-xs text-slate-500">Providing medical, educational, and crisis support to Navodayan families in need.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {welfareCases.map((w) => (
-              <motion.div
-                key={w.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2 }}
-                className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-xs"
-              >
-                <div className="flex justify-between items-start">
-                  <span className="text-[10px] font-semibold px-2.5 py-1 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                    {w.urgency} Priority
-                  </span>
-                  <span className="text-xs font-bold text-emerald-700">{w.status}</span>
-                </div>
-                <h3 className="text-base font-bold text-slate-900">{w.title}</h3>
-                <p className="text-xs text-slate-600 leading-relaxed">{w.description}</p>
-                <div className="space-y-1.5 text-xs text-slate-600 pt-2 border-t border-slate-100">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Beneficiary:</span>
-                    <span className="font-semibold text-slate-900">{w.beneficiary} {w.beneficiaryBatch ? `(Batch ${w.beneficiaryBatch})` : ''}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Target Amount:</span>
-                    <span className="font-bold text-slate-900">₹{(w.amountRequired ?? 0).toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Raised So Far:</span>
-                    <span className="font-bold text-emerald-700">₹{(w.amountRaised ?? 0).toLocaleString('en-IN')}</span>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* SUBTAB 7: 80G DONATION PORTAL */}
-      {activeAlumniSubTab === 'donations' && (
+      {/* SUBTAB 6 & 7: ALUMNI WELFARE FUND & 80G DONATIONS */}
+      {(activeAlumniSubTab === 'welfare' || activeAlumniSubTab === 'donations') && (
         <div className="pt-2">
           <DonationPortalView />
         </div>

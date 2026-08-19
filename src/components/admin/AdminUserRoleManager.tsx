@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useData } from '../../context/DataContext';
 import {
   Users,
@@ -31,11 +31,24 @@ import {
   AlertTriangle,
   GraduationCap,
   Calendar,
-  Heart
+  Heart,
+  Camera,
+  Image as ImageIcon,
+  RotateCcw,
+  Sparkles
 } from 'lucide-react';
-import { UserRole, AlumniProfile } from '../../types';
+import { UserRole, AlumniProfile, HouseType } from '../../types';
 import { SEED_ROLES_PERMISSIONS } from '../../data/seedData';
 import { CSVBulkImportModal } from './CSVBulkImportModal';
+
+const PRESET_AVATARS = [
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=faces',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=faces',
+  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&crop=faces',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop&crop=faces',
+  'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&h=200&fit=crop&crop=faces',
+  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop&crop=faces'
+];
 
 export const AdminUserRoleManager: React.FC = () => {
   const {
@@ -62,21 +75,15 @@ export const AdminUserRoleManager: React.FC = () => {
   // User details view modal
   const [viewingAlumnus, setViewingAlumnus] = useState<AlumniProfile | null>(null);
 
+  // Quick Photo Edit Modal
+  const [photoModalUser, setPhotoModalUser] = useState<AlumniProfile | null>(null);
+  const [tempPhotoUrl, setTempPhotoUrl] = useState('');
+  const [photoCustomUrlInput, setPhotoCustomUrlInput] = useState(false);
+  const photoFileInputRef = useRef<HTMLInputElement>(null);
+
   // Reject confirmation modal with reason
   const [rejectModalItem, setRejectModalItem] = useState<{ id: string; name: string } | null>(null);
   const [rejectReason, setRejectReason] = useState('');
-
-  const handleDownloadSampleAlumni = () => {
-    const template = getCSVTemplate('alumni');
-    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'sample_alumni_data.csv';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
 
   // Direct Alumnus Creator Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -102,9 +109,23 @@ export const AdminUserRoleManager: React.FC = () => {
     isHiring: false,
     verificationStatus: 'verified'
   });
+  const addFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Edit Alumnus Modal
+  // Edit Alumnus Full Profile Modal
   const [editingAlumnus, setEditingAlumnus] = useState<AlumniProfile | null>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDownloadSampleAlumni = () => {
+    const template = getCSVTemplate('alumni');
+    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'sample_alumni_data.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Filter counts
   const pendingCount = alumni.filter(a => a.verificationStatus === 'pending').length;
@@ -130,6 +151,63 @@ export const AdminUserRoleManager: React.FC = () => {
 
   // Available Batches
   const batchYears = Array.from(new Set(alumni.map(a => Number(a.batchYear)))).sort((a: number, b: number) => b - a);
+
+  // Image resize & base64 conversion helper
+  const processImageFile = (file: File, callback: (dataUrl: string) => void) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Please choose a valid image file.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 320;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height = Math.round((height * MAX_SIZE) / width);
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width = Math.round((width * MAX_SIZE) / height);
+            height = MAX_SIZE;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          callback(dataUrl);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleOpenPhotoModal = (alum: AlumniProfile) => {
+    setPhotoModalUser(alum);
+    setTempPhotoUrl(alum.avatar || '');
+    setPhotoCustomUrlInput(false);
+  };
+
+  const handleSavePhotoModal = () => {
+    if (!photoModalUser) return;
+    updateAlumniProfile(photoModalUser.id, { avatar: tempPhotoUrl });
+    if (viewingAlumnus && viewingAlumnus.id === photoModalUser.id) {
+      setViewingAlumnus({ ...viewingAlumnus, avatar: tempPhotoUrl });
+    }
+    if (editingAlumnus && editingAlumnus.id === photoModalUser.id) {
+      setEditingAlumnus({ ...editingAlumnus, avatar: tempPhotoUrl });
+    }
+    setPhotoModalUser(null);
+  };
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,6 +245,9 @@ export const AdminUserRoleManager: React.FC = () => {
     e.preventDefault();
     if (!editingAlumnus) return;
     updateAlumniProfile(editingAlumnus.id, editingAlumnus);
+    if (viewingAlumnus && viewingAlumnus.id === editingAlumnus.id) {
+      setViewingAlumnus(editingAlumnus);
+    }
     setEditingAlumnus(null);
   };
 
@@ -180,6 +261,19 @@ export const AdminUserRoleManager: React.FC = () => {
     setRejectReason('');
   };
 
+  // Helper to convert ISO date string to datetime-local input value
+  const toDateTimeLocal = (dateStr?: string) => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '';
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch {
+      return '';
+    }
+  };
+
   return (
     <div className="space-y-6" id="admin-user-role-manager-container">
       {/* Top Banner */}
@@ -190,9 +284,9 @@ export const AdminUserRoleManager: React.FC = () => {
               <ShieldCheck className="w-3.5 h-3.5" />
               User Approval & Management Hub
             </div>
-            <h2 className="text-2xl font-bold text-white tracking-tight">User Approvals & Role Administration</h2>
+            <h2 className="text-2xl font-bold text-white tracking-tight">User Approvals, Photos & Role Administration</h2>
             <p className="text-slate-300 text-sm mt-1 max-w-2xl">
-              Review pending registrations, view full profile information, approve or reject new alumni, disable/reactivate accounts, and configure permissions.
+              Review registrations, update user profile pictures, adjust registration timestamps, approve or reject new alumni, and assign system roles.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
@@ -299,56 +393,56 @@ export const AdminUserRoleManager: React.FC = () => {
       {/* Search & Filter Bar */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
-            id="alumni-search-input"
             type="text"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            placeholder="Search by name, email, mobile, profession, city..."
-            className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+            placeholder="Search by name, email, phone, designation, or city..."
+            className="w-full bg-slate-800/80 border border-slate-700 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-amber-500"
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          {/* Status Filter */}
           <select
-            id="alumni-status-filter"
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
           >
             <option value="all">All Verification Statuses</option>
-            <option value="pending">Pending Approval ({pendingCount})</option>
-            <option value="verified">Verified ({verifiedCount})</option>
-            <option value="deactivated">Disabled / Deactivated ({deactivatedCount})</option>
-            <option value="rejected">Rejected ({rejectedCount})</option>
+            <option value="pending">Pending Approval</option>
+            <option value="verified">Active & Verified</option>
+            <option value="deactivated">Deactivated / Inactive</option>
+            <option value="rejected">Rejected Requests</option>
           </select>
 
+          {/* Batch Filter */}
           <select
-            id="alumni-batch-filter"
             value={batchFilter}
             onChange={e => setBatchFilter(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
           >
             <option value="all">All Batches</option>
             {batchYears.map(year => (
               <option key={year} value={year.toString()}>
-                Batch {year}
+                Class of {year}
               </option>
             ))}
           </select>
         </div>
       </div>
 
-      {/* Alumni User List Table */}
+      {/* Alumni Table */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-300">
-            <thead className="bg-slate-800/80 text-xs uppercase text-slate-400 font-semibold border-b border-slate-700/80">
+          <table className="w-full text-left text-xs text-slate-300">
+            <thead className="bg-slate-950/80 text-slate-400 uppercase text-[11px] font-bold tracking-wider border-b border-slate-800">
               <tr>
-                <th className="px-5 py-3.5">User / Alumnus</th>
+                <th className="px-5 py-3.5">User / Profile Photo</th>
                 <th className="px-5 py-3.5">Batch & House</th>
                 <th className="px-5 py-3.5">Profession & City</th>
+                <th className="px-5 py-3.5">Registered On</th>
                 <th className="px-5 py-3.5">Account Status</th>
                 <th className="px-5 py-3.5">Assign Role</th>
                 <th className="px-5 py-3.5 text-right">Moderation Actions</th>
@@ -357,7 +451,7 @@ export const AdminUserRoleManager: React.FC = () => {
             <tbody className="divide-y divide-slate-800">
               {filteredAlumni.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400 text-sm">
+                  <td colSpan={7} className="text-center py-12 text-slate-400 text-sm">
                     No alumni records matching the selected criteria.
                   </td>
                 </tr>
@@ -367,15 +461,34 @@ export const AdminUserRoleManager: React.FC = () => {
                     alum.email === 'prakashinfosys1234@gmail.com' ||
                     alum.id === 'alum-1';
 
+                  const regDate = alum.createdAt
+                    ? new Date(alum.createdAt).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric'
+                      })
+                    : 'N/A';
+
                   return (
                     <tr key={alum.id} id={`user-row-${alum.id}`} className="hover:bg-slate-800/40 transition-colors">
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <img
-                            src={alum.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop'}
-                            alt={alum.fullName}
-                            className="w-10 h-10 rounded-xl object-cover border border-slate-700"
-                          />
+                          {/* Avatar with change photo overlay button */}
+                          <div className="relative group shrink-0">
+                            <img
+                              src={alum.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop'}
+                              alt={alum.fullName}
+                              className="w-10 h-10 rounded-xl object-cover border border-slate-700 shadow-xs"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleOpenPhotoModal(alum)}
+                              className="absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-amber-400 cursor-pointer"
+                              title="Update User Image / Profile Photo"
+                            >
+                              <Camera className="w-4 h-4" />
+                            </button>
+                          </div>
                           <div>
                             <div className="font-bold text-white text-sm flex items-center gap-1.5">
                               {alum.fullName}
@@ -397,6 +510,12 @@ export const AdminUserRoleManager: React.FC = () => {
                       <td className="px-5 py-4">
                         <div className="text-white text-xs">{alum.profession}</div>
                         <div className="text-[11px] text-slate-400">{alum.city}, {alum.state}</div>
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="text-slate-300 text-xs font-mono flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                          <span>{regDate}</span>
+                        </div>
                       </td>
                       <td className="px-5 py-4">
                         <span
@@ -438,6 +557,16 @@ export const AdminUserRoleManager: React.FC = () => {
                       </td>
                       <td className="px-5 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Quick Change Photo */}
+                          <button
+                            id={`change-photo-btn-${alum.id}`}
+                            onClick={() => handleOpenPhotoModal(alum)}
+                            className="p-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/40 transition cursor-pointer"
+                            title="Update Profile Photo"
+                          >
+                            <Camera className="w-4 h-4" />
+                          </button>
+
                           {/* View Details */}
                           <button
                             id={`view-user-details-${alum.id}`}
@@ -498,12 +627,12 @@ export const AdminUserRoleManager: React.FC = () => {
                             </button>
                           )}
 
-                          {/* Edit Button */}
+                          {/* Edit Full Profile */}
                           <button
                             id={`edit-alum-btn-${alum.id}`}
                             onClick={() => setEditingAlumnus(alum)}
                             className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition cursor-pointer"
-                            title="Edit Profile"
+                            title="Edit Full Profile & Registration Time"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
@@ -517,7 +646,7 @@ export const AdminUserRoleManager: React.FC = () => {
                               }
                             }}
                             className="p-1.5 rounded-lg bg-rose-900/30 hover:bg-rose-800 text-rose-300 border border-rose-700/40 transition cursor-pointer"
-                            title="Delete"
+                            title="Delete Record"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -532,17 +661,147 @@ export const AdminUserRoleManager: React.FC = () => {
         </div>
       </div>
 
-      {/* User Details Modal */}
+      {/* QUICK PHOTO UPDATE MODAL */}
+      {photoModalUser && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 text-slate-100">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+                  <Camera className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Update Profile Photo</h3>
+                  <p className="text-xs text-slate-400">{photoModalUser.fullName} ({photoModalUser.batchYear})</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPhotoModalUser(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Photo Preview */}
+            <div className="flex flex-col items-center gap-3 py-2">
+              <img
+                src={tempPhotoUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop'}
+                alt="Photo preview"
+                className="w-24 h-24 rounded-2xl object-cover border-2 border-amber-400 shadow-md bg-slate-800"
+              />
+              <span className="text-[11px] text-slate-400">Live Preview</span>
+            </div>
+
+            {/* Actions */}
+            <div className="space-y-3">
+              <input
+                type="file"
+                ref={photoFileInputRef}
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    processImageFile(file, url => setTempPhotoUrl(url));
+                  }
+                }}
+                accept="image/*"
+                className="hidden"
+              />
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => photoFileInputRef.current?.click()}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-sm transition cursor-pointer"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>Upload from Device</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPhotoCustomUrlInput(!photoCustomUrlInput)}
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-xs transition cursor-pointer"
+                >
+                  <ImageIcon className="w-4 h-4" />
+                </button>
+              </div>
+
+              {photoCustomUrlInput && (
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-medium text-slate-400">Or Paste Image URL:</label>
+                  <input
+                    type="url"
+                    value={tempPhotoUrl}
+                    onChange={e => setTempPhotoUrl(e.target.value)}
+                    placeholder="https://example.com/photo.jpg"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              )}
+
+              {/* Preset Avatars */}
+              <div>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1.5">Or Choose from Preset Avatars:</label>
+                <div className="flex items-center justify-between gap-1.5">
+                  {PRESET_AVATARS.map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setTempPhotoUrl(preset)}
+                      className={`w-9 h-9 rounded-xl overflow-hidden border-2 transition transform hover:scale-110 cursor-pointer ${
+                        tempPhotoUrl === preset ? 'border-amber-400 ring-2 ring-amber-500/50' : 'border-slate-700'
+                      }`}
+                    >
+                      <img src={preset} alt={`Avatar ${idx + 1}`} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Save / Cancel Footer */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setPhotoModalUser(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePhotoModal}
+                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer"
+              >
+                <Save className="w-4 h-4" />
+                <span>Save New Photo</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* USER DETAILS VIEW MODAL */}
       {viewingAlumnus && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-xl w-full p-6 shadow-2xl my-8 space-y-5 text-slate-100">
             <div className="flex items-start justify-between pb-4 border-b border-slate-800">
               <div className="flex items-center gap-3">
-                <img
-                  src={viewingAlumnus.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop'}
-                  alt={viewingAlumnus.fullName}
-                  className="w-14 h-14 rounded-2xl object-cover border border-slate-700"
-                />
+                <div className="relative group shrink-0">
+                  <img
+                    src={viewingAlumnus.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop'}
+                    alt={viewingAlumnus.fullName}
+                    className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400/80 shadow-md"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleOpenPhotoModal(viewingAlumnus)}
+                    className="absolute inset-0 bg-black/60 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-amber-400 cursor-pointer"
+                    title="Change Photo"
+                  >
+                    <Camera className="w-5 h-5" />
+                  </button>
+                </div>
                 <div>
                   <h3 className="text-xl font-bold text-white">{viewingAlumnus.fullName}</h3>
                   <div className="flex items-center gap-2 mt-0.5">
@@ -570,7 +829,7 @@ export const AdminUserRoleManager: React.FC = () => {
               </div>
               <button
                 onClick={() => setViewingAlumnus(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg transition"
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -602,6 +861,21 @@ export const AdminUserRoleManager: React.FC = () => {
                 <span className="text-slate-400 block font-medium">Blood Group:</span>
                 <span className="text-white font-semibold">{viewingAlumnus.bloodGroup || 'Not provided'}</span>
               </div>
+              <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 sm:col-span-2">
+                <span className="text-slate-400 block font-medium">Registration Time & Date:</span>
+                <span className="text-amber-300 font-mono text-xs">
+                  {viewingAlumnus.createdAt
+                    ? `${new Date(viewingAlumnus.createdAt).toLocaleString('en-IN', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                      })} (${viewingAlumnus.createdAt})`
+                    : 'Not specified'}
+                </span>
+              </div>
             </div>
 
             {viewingAlumnus.bio && (
@@ -612,65 +886,557 @@ export const AdminUserRoleManager: React.FC = () => {
             )}
 
             {/* Quick Actions in View Modal */}
-            <div className="pt-4 border-t border-slate-800 flex flex-wrap items-center justify-end gap-2">
-              {viewingAlumnus.verificationStatus !== 'verified' && (
-                <button
-                  onClick={() => {
-                    approveAlumni(viewingAlumnus.id);
-                    setViewingAlumnus({ ...viewingAlumnus, verificationStatus: 'verified' });
-                  }}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Approve User</span>
-                </button>
-              )}
-
-              {viewingAlumnus.verificationStatus === 'pending' && (
-                <button
-                  onClick={() => {
-                    setRejectModalItem({ id: viewingAlumnus.id, name: viewingAlumnus.fullName });
-                  }}
-                  className="px-4 py-2 rounded-xl bg-rose-900/50 hover:bg-rose-800 text-rose-200 border border-rose-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition"
-                >
-                  <X className="w-4 h-4" />
-                  <span>Reject User</span>
-                </button>
-              )}
-
-              {viewingAlumnus.verificationStatus === 'verified' && (
-                <button
-                  onClick={() => {
-                    deactivateAlumni(viewingAlumnus.id);
-                    setViewingAlumnus({ ...viewingAlumnus, verificationStatus: 'deactivated' });
-                  }}
-                  className="px-4 py-2 rounded-xl bg-amber-900/50 hover:bg-amber-800 text-amber-200 border border-amber-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition"
-                >
-                  <Lock className="w-4 h-4" />
-                  <span>Disable User</span>
-                </button>
-              )}
-
-              {(viewingAlumnus.verificationStatus === 'deactivated' || viewingAlumnus.verificationStatus === 'rejected') && (
-                <button
-                  onClick={() => {
-                    reactivateAlumni(viewingAlumnus.id);
-                    setViewingAlumnus({ ...viewingAlumnus, verificationStatus: 'verified' });
-                  }}
-                  className="px-4 py-2 rounded-xl bg-emerald-900/50 hover:bg-emerald-800 text-emerald-200 border border-emerald-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition"
-                >
-                  <Unlock className="w-4 h-4" />
-                  <span>Reactivate User</span>
-                </button>
-              )}
-
+            <div className="pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
               <button
-                onClick={() => setViewingAlumnus(null)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+                type="button"
+                onClick={() => {
+                  const toEdit = viewingAlumnus;
+                  setViewingAlumnus(null);
+                  handleOpenPhotoModal(toEdit);
+                }}
+                className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
               >
-                Close
+                <Camera className="w-4 h-4" />
+                <span>Update Photo</span>
+              </button>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {viewingAlumnus.verificationStatus !== 'verified' && (
+                  <button
+                    onClick={() => {
+                      approveAlumni(viewingAlumnus.id);
+                      setViewingAlumnus({ ...viewingAlumnus, verificationStatus: 'verified' });
+                    }}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Approve User</span>
+                  </button>
+                )}
+
+                {viewingAlumnus.verificationStatus === 'pending' && (
+                  <button
+                    onClick={() => {
+                      setRejectModalItem({ id: viewingAlumnus.id, name: viewingAlumnus.fullName });
+                    }}
+                    className="px-4 py-2 rounded-xl bg-rose-900/50 hover:bg-rose-800 text-rose-200 border border-rose-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition"
+                  >
+                    <X className="w-4 h-4" />
+                    <span>Reject User</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const toEdit = viewingAlumnus;
+                    setViewingAlumnus(null);
+                    setEditingAlumnus(toEdit);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  <span>Edit Profile</span>
+                </button>
+
+                <button
+                  onClick={() => setViewingAlumnus(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FULL EDIT ALUMNUS MODAL (Includes Avatar + Registration Time Edit) */}
+      {editingAlumnus && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full p-6 shadow-2xl my-8 space-y-5 text-slate-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400">
+                  <Edit2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Edit Alumnus Profile & Registration Details</h3>
+                  <p className="text-xs text-slate-400">Update photo, credentials, status, and registration timestamp.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingAlumnus(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
+
+            <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
+              {/* Photo Edit Section */}
+              <div className="p-3.5 bg-slate-800/80 rounded-2xl border border-slate-700 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-amber-400 font-bold flex items-center gap-1.5">
+                    <Camera className="w-4 h-4" />
+                    <span>Profile Photo / Avatar</span>
+                  </label>
+                  <span className="text-[11px] text-slate-400">Device upload or URL</span>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <img
+                    src={editingAlumnus.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop'}
+                    alt="Preview"
+                    className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400 shadow-md bg-slate-900"
+                  />
+                  <div className="flex-1 space-y-2">
+                    <input
+                      type="file"
+                      ref={editFileInputRef}
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          processImageFile(file, url => setEditingAlumnus({ ...editingAlumnus, avatar: url }));
+                        }
+                      }}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => editFileInputRef.current?.click()}
+                        className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition cursor-pointer"
+                      >
+                        Upload Device Photo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const randomPreset = PRESET_AVATARS[Math.floor(Math.random() * PRESET_AVATARS.length)];
+                          setEditingAlumnus({ ...editingAlumnus, avatar: randomPreset });
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-semibold text-xs transition cursor-pointer"
+                      >
+                        Pick Random Preset
+                      </button>
+                    </div>
+                    <input
+                      type="url"
+                      value={editingAlumnus.avatar || ''}
+                      onChange={e => setEditingAlumnus({ ...editingAlumnus, avatar: e.target.value })}
+                      placeholder="Or enter Image URL"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Registration Timestamp (Option Time of Registration) */}
+              <div className="p-3.5 bg-amber-500/10 rounded-2xl border border-amber-500/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-amber-300 font-bold flex items-center gap-1.5">
+                    <Clock className="w-4 h-4" />
+                    <span>Registration Time / Date (Option to Adjust)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setEditingAlumnus({ ...editingAlumnus, createdAt: new Date().toISOString() })}
+                    className="text-[11px] text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Set to Current Time</span>
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block mb-1">Pick Date & Time:</span>
+                    <input
+                      type="datetime-local"
+                      value={toDateTimeLocal(editingAlumnus.createdAt)}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setEditingAlumnus({
+                          ...editingAlumnus,
+                          createdAt: val ? new Date(val).toISOString() : new Date().toISOString()
+                        });
+                      }}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block mb-1">Raw Timestamp (ISO String):</span>
+                    <input
+                      type="text"
+                      value={editingAlumnus.createdAt || ''}
+                      onChange={e => setEditingAlumnus({ ...editingAlumnus, createdAt: e.target.value })}
+                      placeholder="2026-08-19T10:00:00.000Z"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-300 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Names & Contact */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingAlumnus.fullName}
+                    onChange={e => setEditingAlumnus({ ...editingAlumnus, fullName: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Email / User ID *</label>
+                  <input
+                    type="email"
+                    required
+                    value={editingAlumnus.email}
+                    onChange={e => setEditingAlumnus({ ...editingAlumnus, email: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              {/* Batch, House & Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Passout Batch *</label>
+                  <select
+                    value={editingAlumnus.batchYear}
+                    onChange={e => setEditingAlumnus({ ...editingAlumnus, batchYear: Number(e.target.value) })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  >
+                    {Array.from({ length: 35 }, (_, i) => 1994 + i).map(yr => (
+                      <option key={yr} value={yr}>
+                        Class of {yr}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Navodaya House</label>
+                  <select
+                    value={editingAlumnus.house}
+                    onChange={e => setEditingAlumnus({ ...editingAlumnus, house: e.target.value as HouseType })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="Aravali">Aravali</option>
+                    <option value="Nilgiri">Nilgiri</option>
+                    <option value="Shivalik">Shivalik</option>
+                    <option value="Udaygiri">Udaygiri</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Verification Status</label>
+                  <select
+                    value={editingAlumnus.verificationStatus || 'pending'}
+                    onChange={e => setEditingAlumnus({ ...editingAlumnus, verificationStatus: e.target.value as any })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="verified">Verified & Active</option>
+                    <option value="pending">Pending Approval</option>
+                    <option value="deactivated">Deactivated / Disabled</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Profession & Company */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Profession / Title</label>
+                  <input
+                    type="text"
+                    value={editingAlumnus.profession}
+                    onChange={e => setEditingAlumnus({ ...editingAlumnus, profession: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Company / Firm</label>
+                  <input
+                    type="text"
+                    value={editingAlumnus.company || ''}
+                    onChange={e => setEditingAlumnus({ ...editingAlumnus, company: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              {/* Location & Mobile */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">City</label>
+                  <input
+                    type="text"
+                    value={editingAlumnus.city}
+                    onChange={e => setEditingAlumnus({ ...editingAlumnus, city: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">State</label>
+                  <input
+                    type="text"
+                    value={editingAlumnus.state}
+                    onChange={e => setEditingAlumnus({ ...editingAlumnus, state: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Phone Number</label>
+                  <input
+                    type="tel"
+                    value={editingAlumnus.phone || ''}
+                    onChange={e => setEditingAlumnus({ ...editingAlumnus, phone: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              {/* Blood Group & Bio */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Blood Group</label>
+                  <select
+                    value={editingAlumnus.bloodGroup || 'B+'}
+                    onChange={e => setEditingAlumnus({ ...editingAlumnus, bloodGroup: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  >
+                    {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bg => (
+                      <option key={bg} value={bg}>{bg}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-slate-400 font-semibold mb-1">Bio / Notes</label>
+                  <input
+                    type="text"
+                    value={editingAlumnus.bio || ''}
+                    onChange={e => setEditingAlumnus({ ...editingAlumnus, bio: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingAlumnus(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Save Profile Updates</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DIRECT ALUMNUS CREATOR MODAL */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full p-6 shadow-2xl my-8 space-y-5 text-slate-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Add Verified Alumnus Directly</h3>
+                  <p className="text-xs text-slate-400">Instantly create a verified alumnus record in the directory.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddSubmit} className="space-y-4 text-xs">
+              {/* Photo Upload */}
+              <div className="p-3.5 bg-slate-800/80 rounded-2xl border border-slate-700 space-y-2">
+                <label className="text-amber-400 font-bold flex items-center gap-1.5">
+                  <Camera className="w-4 h-4" />
+                  <span>Profile Photo</span>
+                </label>
+                <div className="flex items-center gap-4">
+                  <img
+                    src={newAlumnus.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop'}
+                    alt="Preview"
+                    className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400"
+                  />
+                  <div className="flex-1 space-y-1.5">
+                    <input
+                      type="file"
+                      ref={addFileInputRef}
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          processImageFile(file, url => setNewAlumnus({ ...newAlumnus, avatar: url }));
+                        }
+                      }}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => addFileInputRef.current?.click()}
+                        className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer"
+                      >
+                        Upload Photo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const randomPreset = PRESET_AVATARS[Math.floor(Math.random() * PRESET_AVATARS.length)];
+                          setNewAlumnus({ ...newAlumnus, avatar: randomPreset });
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-semibold text-xs cursor-pointer"
+                      >
+                        Preset
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Names & Contact */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newAlumnus.fullName}
+                    onChange={e => setNewAlumnus({ ...newAlumnus, fullName: e.target.value })}
+                    placeholder="e.g. Ramesh Kumar"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Email / User ID *</label>
+                  <input
+                    type="email"
+                    required
+                    value={newAlumnus.email}
+                    onChange={e => setNewAlumnus({ ...newAlumnus, email: e.target.value })}
+                    placeholder="ramesh@example.com"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              {/* Batch & House */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Passout Batch *</label>
+                  <select
+                    value={newAlumnus.batchYear}
+                    onChange={e => setNewAlumnus({ ...newAlumnus, batchYear: Number(e.target.value) })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  >
+                    {Array.from({ length: 35 }, (_, i) => 1994 + i).map(yr => (
+                      <option key={yr} value={yr}>
+                        Class of {yr}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Navodaya House</label>
+                  <select
+                    value={newAlumnus.house}
+                    onChange={e => setNewAlumnus({ ...newAlumnus, house: e.target.value as HouseType })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="Aravali">Aravali</option>
+                    <option value="Nilgiri">Nilgiri</option>
+                    <option value="Shivalik">Shivalik</option>
+                    <option value="Udaygiri">Udaygiri</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Phone Number</label>
+                  <input
+                    type="tel"
+                    value={newAlumnus.phone}
+                    onChange={e => setNewAlumnus({ ...newAlumnus, phone: e.target.value })}
+                    placeholder="+91 9876543210"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              {/* Profession & Location */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Profession</label>
+                  <input
+                    type="text"
+                    value={newAlumnus.profession}
+                    onChange={e => setNewAlumnus({ ...newAlumnus, profession: e.target.value })}
+                    placeholder="e.g. Doctor"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">City</label>
+                  <input
+                    type="text"
+                    value={newAlumnus.city}
+                    onChange={e => setNewAlumnus({ ...newAlumnus, city: e.target.value })}
+                    placeholder="e.g. Jodhpur"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Blood Group</label>
+                  <select
+                    value={newAlumnus.bloodGroup}
+                    onChange={e => setNewAlumnus({ ...newAlumnus, bloodGroup: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  >
+                    {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bg => (
+                      <option key={bg} value={bg}>{bg}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Create Alumnus Record</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -703,14 +1469,14 @@ export const AdminUserRoleManager: React.FC = () => {
                   setRejectModalItem(null);
                   setRejectReason('');
                 }}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmReject}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md"
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md cursor-pointer"
               >
                 Confirm Rejection
               </button>
@@ -728,4 +1494,3 @@ export const AdminUserRoleManager: React.FC = () => {
     </div>
   );
 };
-

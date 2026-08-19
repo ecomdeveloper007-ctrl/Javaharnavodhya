@@ -20,10 +20,12 @@ import {
   Layers,
   FileText,
   Download,
-  Upload
+  Upload,
+  Image as ImageIcon
 } from 'lucide-react';
 import { BoardTopper, VMCLeader, HouseInfo } from '../../types';
 import { CSVBulkImportModal } from './CSVBulkImportModal';
+import { AdminSliderCMS } from './AdminSliderCMS';
 
 export const AdminWebsiteCMS: React.FC = () => {
   const {
@@ -42,7 +44,7 @@ export const AdminWebsiteCMS: React.FC = () => {
     getCSVTemplate
   } = useData();
 
-  const [activeSubTab, setActiveSubTab] = useState<'general' | 'principal' | 'houses' | 'toppers' | 'vmc'>('general');
+  const [activeSubTab, setActiveSubTab] = useState<'slider' | 'general' | 'principal' | 'houses' | 'toppers' | 'vmc'>('slider');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [csvModalModule, setCsvModalModule] = useState<string | null>(null);
 
@@ -152,6 +154,7 @@ export const AdminWebsiteCMS: React.FC = () => {
         {/* Sub-Navigation Tabs */}
         <div className="flex flex-wrap gap-2 mt-6 pt-5 border-t border-emerald-500/20">
           {[
+            { id: 'slider', label: 'Hero Slider Banners', icon: ImageIcon },
             { id: 'general', label: 'School Identity & Ticker', icon: School },
             { id: 'principal', label: "Principal's Desk & Bio", icon: User },
             { id: 'houses', label: 'Houses & Points Master', icon: Layers },
@@ -165,7 +168,7 @@ export const AdminWebsiteCMS: React.FC = () => {
                 key={tab.id}
                 id={`cms-tab-${tab.id}`}
                 onClick={() => setActiveSubTab(tab.id as any)}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   isActive
                     ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
                     : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60'
@@ -178,6 +181,9 @@ export const AdminWebsiteCMS: React.FC = () => {
           })}
         </div>
       </div>
+
+      {/* 0. Hero Slider Banners CMS */}
+      {activeSubTab === 'slider' && <AdminSliderCMS />}
 
       {/* 1. General Settings Form */}
       {activeSubTab === 'general' && (

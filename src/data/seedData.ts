@@ -28,7 +28,8 @@ import {
   BloodDonor,
   BloodRequest,
   PaymentSettings,
-  DonationRecord
+  DonationRecord,
+  BannerSlide
 } from '../types';
 
 export const SEED_SCHOOL_SETTINGS: SchoolSettings = {
@@ -1618,5 +1619,85 @@ export const SEED_DONATIONS: DonationRecord[] = [
     createdAt: '2025-03-01T08:45:00.000Z'
   }
 ];
+
+export const SEED_BANNER_SLIDES: BannerSlide[] = [
+  {
+    id: 'slide-1',
+    title: 'Nurturing Rural Talent, Inspiring National Excellence',
+    titleHindi: 'ग्रामीण प्रतिभाओं का संवर्धन, राष्ट्रीय उत्कृष्टता की प्रेरणा',
+    subtitle: 'Premier autonomous residential co-educational institution under Navodaya Vidyalaya Samiti, Ministry of Education, Govt. of India.',
+    subtitleHindi: 'शिक्षा मंत्रालय (भारत सरकार) के अंतर्गत गुणवत्तापूर्ण एवं निःशुल्क आधुनिक आवासीय शिक्षा।',
+    badgeText: 'JNVST Admissions 2026-27 Open',
+    badgeTextHindi: 'जे.एन.वी.एस.टी. प्रवेश 2026-27 प्रारंभ',
+    imageUrl: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=1920&h=800&fit=crop',
+    ctaText: 'Apply for Admission',
+    ctaTextHindi: 'प्रवेश हेतु आवेदन करें',
+    ctaLink: 'admissions',
+    secondaryCtaText: 'About Campus',
+    secondaryCtaTextHindi: 'परिसर परिचय',
+    secondaryCtaLink: 'about',
+    isActive: true,
+    order: 1,
+    createdAt: '2025-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'slide-2',
+    title: 'One Family, One Spirit — Navodaya Forever',
+    titleHindi: 'एक परिवार, एक चेतना — नवोदयन सदैव',
+    subtitle: 'Connecting 1,800+ JNV Pachpadra alumni worldwide across medicine, civil services, engineering, defense & entrepreneurship.',
+    subtitleHindi: 'चिकित्सा, सिविल सेवा, इंजीनियरिंग, रक्षा एवं शोध के क्षेत्र में 1,800+ पूर्व छात्रों का वैश्विक संगठन।',
+    badgeText: 'Global Alumni Network',
+    badgeTextHindi: 'वैश्विक पूर्व छात्र संजाल',
+    imageUrl: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1920&h=800&fit=crop',
+    ctaText: 'Explore Alumni Directory',
+    ctaTextHindi: 'पूर्व छात्र निर्देशिका देखें',
+    ctaLink: 'alumni',
+    secondaryCtaText: 'Alumni Welfare & Giving',
+    secondaryCtaTextHindi: 'पूर्व छात्र कल्याण कोष',
+    secondaryCtaLink: 'donations',
+    isActive: true,
+    order: 2,
+    createdAt: '2025-01-02T00:00:00.000Z'
+  },
+  {
+    id: 'slide-3',
+    title: '100% CBSE Pass Rate & Academic Brilliance',
+    titleHindi: '100% सीबीएसई परिणाम एवं बोर्ड टॉपर गौरवशाली परंपरा',
+    subtitle: 'Smart digital classrooms, state-of-the-art science labs, 8,500+ library books, and intensive coaching for IIT-JEE, NEET & NDA.',
+    subtitleHindi: 'स्मार्ट डिजिटल कक्षाएं, आधुनिक प्रयोगशालाएं एवं राष्ट्रीय प्रतियोगी परीक्षाओं हेतु उत्कृष्ट मार्गदर्शन।',
+    badgeText: 'CBSE Board Results & Toppers',
+    badgeTextHindi: 'सीबीएसई बोर्ड परीक्षा परिणाम',
+    imageUrl: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=1920&h=800&fit=crop',
+    ctaText: 'View Board Toppers',
+    ctaTextHindi: 'बोर्ड टॉपर्स सूची',
+    ctaLink: 'academics',
+    secondaryCtaText: 'Faculty Directory',
+    secondaryCtaTextHindi: 'शिक्षक परिचय',
+    secondaryCtaLink: 'faculty',
+    isActive: true,
+    order: 3,
+    createdAt: '2025-01-03T00:00:00.000Z'
+  },
+  {
+    id: 'slide-4',
+    title: 'Annual Grand Alumni Convention & Golden Jubilee Meet',
+    titleHindi: 'वार्षिक पूर्व छात्र महासम्मेलन एवं स्वर्ण जयंती मिलन',
+    subtitle: 'Reconnect with revered teachers, batchmates, and house brothers at the sprawling 32-acre green Pachpadra campus.',
+    subtitleHindi: 'अपने सहपाठियों एवं आदरणीय गुरुजनों से पुनः जुड़ें और स्वर्णिम नवोदय स्मृतियों को जीवंत करें।',
+    badgeText: 'Upcoming Campus Reunion',
+    badgeTextHindi: 'आगामी परिसर मिलन समारोह',
+    imageUrl: 'https://images.unsplash.com/photo-1511578314322-379afb476865?w=1920&h=800&fit=crop',
+    ctaText: 'View Events & RSVP',
+    ctaTextHindi: 'कार्यक्रम विवरण एवं पंजीयन',
+    ctaLink: 'events',
+    secondaryCtaText: 'Campus Photo Gallery',
+    secondaryCtaTextHindi: 'फोटो गैलरी देखें',
+    secondaryCtaLink: 'gallery',
+    isActive: true,
+    order: 4,
+    createdAt: '2025-01-04T00:00:00.000Z'
+  }
+];
+
 
 

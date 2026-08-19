@@ -31,6 +31,7 @@ import {
   Bot,
   Languages,
   Heart,
+  HeartHandshake,
   Droplet,
   Receipt
 } from 'lucide-react';
@@ -648,31 +649,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAIChat }) => {
                         </div>
                       </button>
                       <button
-                        onClick={() => handleNavClick('alumni', 'welfare')}
-                        className={`w-full text-left px-3.5 py-2 text-xs flex items-center space-x-2.5 cursor-pointer ${
-                          activeTab === 'alumni' && activeAlumniSubTab === 'welfare'
-                            ? 'bg-amber-50 text-amber-900 font-bold'
-                            : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
-                        }`}
-                      >
-                        <Compass className="w-4 h-4 text-emerald-600" />
-                        <div>
-                          <div className="font-semibold leading-tight">{t.welfareAid}</div>
-                          <div className="text-[10px] text-slate-400 font-normal">{isHindi ? 'छात्रवृत्ति एवं साथी सहयोग' : 'Student scholarships and support'}</div>
-                        </div>
-                      </button>
-                      <button
                         onClick={() => handleNavClick('donations')}
                         className={`w-full text-left px-3.5 py-2 text-xs flex items-center space-x-2.5 cursor-pointer ${
-                          activeTab === 'donations'
+                          activeTab === 'donations' || (activeTab === 'alumni' && activeAlumniSubTab === 'welfare')
                             ? 'bg-amber-50 text-amber-950 font-bold'
                             : 'text-slate-700 hover:bg-amber-50/60 hover:text-amber-950'
                         }`}
                       >
-                        <Receipt className="w-4 h-4 text-amber-600" />
+                        <HeartHandshake className="w-4 h-4 text-emerald-600" />
                         <div>
-                          <div className="font-semibold leading-tight text-amber-900">{isHindi ? '80G दान एवं रसीद पोर्टल' : '80G Donation & Giving Portal'}</div>
-                          <div className="text-[10px] text-slate-400 font-normal">{isHindi ? '50% आयकर छूट एवं तत्काल डिजिटल रसीद' : '50% Tax Exemption & Instant 80G Receipts'}</div>
+                          <div className="font-semibold leading-tight text-amber-900">{isHindi ? 'पूर्व छात्र कल्याण निधि (Alumni Welfare Fund)' : 'Alumni Welfare Fund (80G)'}</div>
+                          <div className="text-[10px] text-slate-400 font-normal">{isHindi ? 'छात्रवृत्ति, आपातकालीन सहायता व 50% आयकर छूट' : '80G tax-exempt scholarships, medical relief & giving'}</div>
                         </div>
                       </button>
                       <button
@@ -953,26 +940,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAIChat }) => {
                   <span className="truncate">{t.memoriesWall}</span>
                 </button>
                 <button
-                  onClick={() => handleNavClick('alumni', 'welfare')}
-                  className={`text-left px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-1.5 cursor-pointer ${
-                    activeTab === 'alumni' && activeAlumniSubTab === 'welfare'
-                      ? 'bg-amber-600 text-white font-bold'
-                      : 'bg-white/80 text-slate-800 hover:bg-white'
-                  }`}
-                >
-                  <Compass className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span className="truncate">{t.welfareAid}</span>
-                </button>
-                <button
                   onClick={() => handleNavClick('donations')}
                   className={`text-left px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-1.5 cursor-pointer ${
-                    activeTab === 'donations'
+                    activeTab === 'donations' || (activeTab === 'alumni' && activeAlumniSubTab === 'welfare')
                       ? 'bg-amber-600 text-white font-bold'
                       : 'bg-white/80 text-amber-900 hover:bg-white'
                   }`}
                 >
-                  <Receipt className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  <span className="truncate">80G Donations</span>
+                  <HeartHandshake className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span className="truncate">{isHindi ? 'कल्याण निधि (80G)' : 'Alumni Welfare (80G)'}</span>
                 </button>
                 <button
                   onClick={() => handleNavClick('blood-donation')}

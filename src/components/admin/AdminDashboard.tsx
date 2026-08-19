@@ -686,7 +686,18 @@ export const AdminDashboard: React.FC<{ onClose?: () => void }> = ({ onClose }) 
                 <div className="space-y-2.5">
                   <button
                     onClick={() => setActiveTab('website')}
-                    className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-800 hover:bg-slate-700/80 text-left transition-colors border border-slate-700/60"
+                    className="w-full flex items-center justify-between p-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-left transition-colors border border-amber-500/30 cursor-pointer group"
+                  >
+                    <div>
+                      <div className="text-xs font-bold text-amber-300 group-hover:text-amber-200">Hero Slider Banners & Images</div>
+                      <div className="text-[11px] text-slate-300">Upload slider images, edit captions & CTAs</div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-amber-400" />
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('website')}
+                    className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-800 hover:bg-slate-700/80 text-left transition-colors border border-slate-700/60 cursor-pointer"
                   >
                     <div>
                       <div className="text-xs font-bold text-white">Institutional Settings & Ticker</div>

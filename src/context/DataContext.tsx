@@ -30,7 +30,8 @@ import {
   FinancialReport,
   FinancialTransaction,
   UserRole,
-  CSVImportResult
+  CSVImportResult,
+  BannerSlide
 } from '../types';
 import {
   SEED_ALUMNI,
@@ -60,7 +61,8 @@ import {
   SEED_AUDIT_LOGS,
   SEED_FINANCIAL_REPORTS,
   SEED_TRANSACTIONS,
-  SEED_ROLES_PERMISSIONS
+  SEED_ROLES_PERMISSIONS,
+  SEED_BANNER_SLIDES
 } from '../data/seedData';
 import {
   auth,
@@ -124,6 +126,14 @@ export interface DataContextType {
   addVMCMember: (member: Omit<VMCLeader, 'id'>) => void;
   updateVMCMember: (id: string, updates: Partial<VMCLeader>) => void;
   deleteVMCMember: (id: string) => void;
+
+  // Banner Slider
+  bannerSlides: BannerSlide[];
+  addBannerSlide: (slide: Omit<BannerSlide, 'id' | 'createdAt'>) => void;
+  updateBannerSlide: (id: string, updates: Partial<BannerSlide>) => void;
+  deleteBannerSlide: (id: string) => void;
+  reorderBannerSlides: (newOrderedList: BannerSlide[]) => void;
+  resetBannerSlidesToDefault: () => void;
 
   // School Notices
   notices: SchoolNotice[];
@@ -349,6 +359,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [financialReports, setFinancialReports] = useState<FinancialReport[]>(SEED_FINANCIAL_REPORTS);
   const [ledgerTransactions, setLedgerTransactions] = useState<FinancialTransaction[]>(SEED_TRANSACTIONS);
+  const [bannerSlides, setBannerSlides] = useState<BannerSlide[]>(SEED_BANNER_SLIDES);
 
   // Load and Hydrate ALL Collections directly from Firestore
   useEffect(() => {
@@ -385,7 +396,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           loadedAuditLogs,
           loadedReports,
           loadedTransactions,
-          loadedRoles
+          loadedRoles,
+          loadedSlides
         ] = await Promise.all([
           syncSingletonWithFirestore('school_settings', 'current', SEED_SCHOOL_SETTINGS),
           syncSingletonWithFirestore('payment_settings', 'current', SEED_PAYMENT_SETTINGS),
@@ -420,7 +432,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             'sunita.ias@rajasthan.gov.in': 'alumni_manager',
             'vikram.shekhawat@google.com': 'election_officer',
             'rajesh.ca@audit.in': 'auditor'
-          })
+          }),
+          syncCollectionWithFirestore('hero_slides', SEED_BANNER_SLIDES)
         ]);
 
         if (!isMounted) return;
@@ -430,6 +443,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (loadedHouses && loadedHouses.length > 0) setHouses(loadedHouses);
         if (loadedToppers && loadedToppers.length > 0) setToppers(loadedToppers);
         if (loadedVmc && loadedVmc.length > 0) setVmcMembers(loadedVmc);
+        if (loadedSlides && loadedSlides.length > 0) {
+          setBannerSlides([...loadedSlides].sort((a, b) => (a.order || 0) - (b.order || 0)));
+        }
         if (loadedNotices && loadedNotices.length > 0) setNotices(loadedNotices);
         if (loadedFaculty && loadedFaculty.length > 0) setFaculty(loadedFaculty);
         if (loadedGallery && loadedGallery.length > 0) setGallery(loadedGallery);
@@ -997,6 +1013,47 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const deleteVMCMember = (id: string) => {
     setVmcMembers(prev => prev.filter(m => m.id !== id));
     deleteDocFromFirestore('vmc_members', id);
+  };
+
+  // Hero Banner Slider Operations with Firestore
+  const addBannerSlide = (slide: Omit<BannerSlide, 'id' | 'createdAt'>) => {
+    const newSlide: BannerSlide = {
+      ...slide,
+      id: `slide-${Date.now()}`,
+      createdAt: new Date().toISOString()
+    };
+    setBannerSlides(prev => {
+      const updated = [...prev, newSlide].sort((a, b) => (a.order || 0) - (b.order || 0));
+      return updated;
+    });
+    saveDocToFirestore('hero_slides', newSlide.id, newSlide);
+  };
+
+  const updateBannerSlide = (id: string, updates: Partial<BannerSlide>) => {
+    setBannerSlides(prev => {
+      const next = prev.map(s => (s.id === id ? { ...s, ...updates } : s)).sort((a, b) => (a.order || 0) - (b.order || 0));
+      const target = next.find(s => s.id === id);
+      if (target) {
+        saveDocToFirestore('hero_slides', id, target);
+      }
+      return next;
+    });
+  };
+
+  const deleteBannerSlide = (id: string) => {
+    setBannerSlides(prev => prev.filter(s => s.id !== id));
+    deleteDocFromFirestore('hero_slides', id);
+  };
+
+  const reorderBannerSlides = (newOrderedList: BannerSlide[]) => {
+    const updated = newOrderedList.map((item, index) => ({ ...item, order: index + 1 }));
+    setBannerSlides(updated);
+    updated.forEach(s => saveDocToFirestore('hero_slides', s.id, s));
+  };
+
+  const resetBannerSlidesToDefault = () => {
+    setBannerSlides(SEED_BANNER_SLIDES);
+    SEED_BANNER_SLIDES.forEach(s => saveDocToFirestore('hero_slides', s.id, s));
   };
 
   // School Notices Operations with Firestore
@@ -2482,6 +2539,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addVMCMember,
         updateVMCMember,
         deleteVMCMember,
+
+        bannerSlides,
+        addBannerSlide,
+        updateBannerSlide,
+        deleteBannerSlide,
+        reorderBannerSlides,
+        resetBannerSlidesToDefault,
 
         notices,
         addNotice,

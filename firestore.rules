@@ -307,6 +307,16 @@ service cloud.firestore {
         isSignedIn() && resource.data.submittedByEmail == request.auth.token.email
       );
     }
+
+    // 17. Hero Slider Banners (CMS)
+    match /hero_slides/{slideId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /banner_slides/{slideId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }
 

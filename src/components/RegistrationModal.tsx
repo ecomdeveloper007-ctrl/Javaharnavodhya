@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useData } from '../context/DataContext';
 import { useLanguage } from '../context/LanguageContext';
 import {
@@ -20,9 +20,22 @@ import {
   Lock,
   Eye,
   EyeOff,
-  Clock
+  Clock,
+  Camera,
+  Upload,
+  Image as ImageIcon,
+  Trash2
 } from 'lucide-react';
 import { HouseType } from '../types';
+
+const PRESET_AVATARS = [
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=faces',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=faces',
+  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&crop=faces',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop&crop=faces',
+  'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&h=200&fit=crop&crop=faces',
+  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop&crop=faces'
+];
 
 export const RegistrationModal: React.FC = () => {
   const {
@@ -39,6 +52,11 @@ export const RegistrationModal: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [avatar, setAvatar] = useState<string>('');
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [customImageUrl, setCustomImageUrl] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [batchYear, setBatchYear] = useState<number>(2014);
   const [house, setHouse] = useState<HouseType>('Aravali');
   const [profession, setProfession] = useState('Software Engineer');
@@ -61,6 +79,7 @@ export const RegistrationModal: React.FC = () => {
     profession: string;
     city: string;
     email: string;
+    avatar?: string;
   } | null>(null);
 
   const resetForm = () => {
@@ -69,6 +88,9 @@ export const RegistrationModal: React.FC = () => {
     setPassword('');
     setConfirmPassword('');
     setShowPassword(false);
+    setAvatar('');
+    setShowUrlInput(false);
+    setCustomImageUrl('');
     setBatchYear(2014);
     setHouse('Aravali');
     setProfession('Software Engineer');
@@ -83,6 +105,53 @@ export const RegistrationModal: React.FC = () => {
     setIsSubmitted(false);
     setErrorMessage(null);
     setSubmittedData(null);
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setErrorMessage(isHindi ? 'कृपया एक मान्य छवि फ़ाइल चुनें।' : 'Please choose a valid image file.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 320;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height = Math.round((height * MAX_SIZE) / width);
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width = Math.round((width * MAX_SIZE) / height);
+            height = MAX_SIZE;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          setAvatar(dataUrl);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleApplyCustomUrl = () => {
+    if (customImageUrl.trim()) {
+      setAvatar(customImageUrl.trim());
+      setShowUrlInput(false);
+    }
   };
 
   const handleClose = () => {
@@ -134,6 +203,7 @@ export const RegistrationModal: React.FC = () => {
         {
           email: trimmedEmail,
           fullName: trimmedName,
+          avatar: avatar.trim() || undefined,
           batchYear,
           house,
           profession: profession.trim() || 'Professional',
@@ -155,7 +225,8 @@ export const RegistrationModal: React.FC = () => {
           house,
           profession: profession.trim() || 'Professional',
           city: city.trim() || 'Jaipur',
-          email: trimmedEmail
+          email: trimmedEmail,
+          avatar: avatar.trim() || undefined
         });
         setIsSubmitted(true);
       } else {
@@ -251,6 +322,19 @@ export const RegistrationModal: React.FC = () => {
 
               {/* Summary Card */}
               <div className="bg-white rounded-xl p-3 text-xs text-slate-800 space-y-1 shadow-2xs border border-amber-200/70">
+                {submittedData.avatar && (
+                  <div className="flex items-center gap-3 pb-2 mb-2 border-b border-slate-100">
+                    <img
+                      src={submittedData.avatar}
+                      alt={submittedData.fullName}
+                      className="w-12 h-12 rounded-xl object-cover border border-amber-300 shadow-xs"
+                    />
+                    <div>
+                      <div className="font-bold text-slate-900">{submittedData.fullName}</div>
+                      <div className="text-[11px] text-emerald-600 font-medium">Profile Photo Attached</div>
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-between items-center py-0.5">
                   <span className="text-slate-500 font-medium">{isHindi ? 'नाम:' : 'Name:'}</span>
                   <span className="font-bold text-slate-900">{submittedData.fullName}</span>
@@ -297,6 +381,110 @@ export const RegistrationModal: React.FC = () => {
                 <span>{errorMessage}</span>
               </div>
             )}
+
+            {/* Profile Photo Upload / Avatar Selection Section */}
+            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-slate-800 font-semibold flex items-center gap-1.5">
+                  <Camera className="w-4 h-4 text-amber-600" />
+                  <span>{isHindi ? 'प्रोफ़ाइल फोटो / तस्वीर (वैकल्पिक)' : 'Profile Photo (Optional)'}</span>
+                </label>
+                {avatar && (
+                  <button
+                    type="button"
+                    onClick={() => setAvatar('')}
+                    className="text-[11px] text-rose-600 hover:text-rose-700 font-medium flex items-center gap-1 cursor-pointer"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>{isHindi ? 'हटाएं' : 'Remove'}</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-3.5">
+                {/* Avatar Preview */}
+                <div className="relative group shrink-0">
+                  <img
+                    src={avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop'}
+                    alt="Avatar preview"
+                    className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400/80 shadow-sm bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute inset-0 bg-black/40 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white cursor-pointer"
+                    title="Upload photo"
+                  >
+                    <Camera className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Upload & Select Options */}
+                <div className="flex-1 w-full space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleImageFileChange}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-xs transition cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{isHindi ? 'डिवाइस से फ़ोटो चुनें' : 'Upload from Device'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowUrlInput(!showUrlInput)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-semibold text-xs transition cursor-pointer"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5" />
+                      <span>{isHindi ? 'छवि URL दर्ज करें' : 'Paste Image URL'}</span>
+                    </button>
+                  </div>
+
+                  {/* Preset Avatars Row */}
+                  <div className="flex items-center gap-1.5 pt-1">
+                    <span className="text-[10px] text-slate-500 font-medium mr-1">Presets:</span>
+                    {PRESET_AVATARS.map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setAvatar(preset)}
+                        className={`w-7 h-7 rounded-lg overflow-hidden border transition transform hover:scale-105 cursor-pointer ${
+                          avatar === preset ? 'ring-2 ring-amber-500 border-transparent' : 'border-slate-300'
+                        }`}
+                      >
+                        <img src={preset} alt={`Preset ${idx + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+
+                  {showUrlInput && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <input
+                        type="url"
+                        value={customImageUrl}
+                        onChange={e => setCustomImageUrl(e.target.value)}
+                        placeholder="https://example.com/my-photo.jpg"
+                        className="flex-1 bg-white p-2 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyCustomUrl}
+                        className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold cursor-pointer"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
             {/* Basic Info */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

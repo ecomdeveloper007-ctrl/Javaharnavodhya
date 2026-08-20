@@ -35,11 +35,15 @@ import {
   Camera,
   Image as ImageIcon,
   RotateCcw,
-  Sparkles
+  Sparkles,
+  HelpCircle,
+  ListFilter,
+  Sliders
 } from 'lucide-react';
 import { UserRole, AlumniProfile, HouseType } from '../../types';
 import { SEED_ROLES_PERMISSIONS } from '../../data/seedData';
 import { CSVBulkImportModal } from './CSVBulkImportModal';
+import { RoleAccessMatrix, ROLE_METADATA } from './RoleAccessMatrix';
 
 const PRESET_AVATARS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=faces',
@@ -55,6 +59,7 @@ export const AdminUserRoleManager: React.FC = () => {
     alumni,
     user,
     currentRole,
+    userRolesMap,
     assignUserRole,
     addAlumnusDirectly,
     updateAlumniProfile,
@@ -71,6 +76,8 @@ export const AdminUserRoleManager: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [batchFilter, setBatchFilter] = useState('all');
   const [isCSVModalOpen, setIsCSVModalOpen] = useState(false);
+  const [activeSubView, setActiveSubView] = useState<'users' | 'permissions'>('users');
+  const [inspectingRole, setInspectingRole] = useState<UserRole | null>(null);
 
   // User details view modal
   const [viewingAlumnus, setViewingAlumnus] = useState<AlumniProfile | null>(null);
@@ -390,6 +397,58 @@ export const AdminUserRoleManager: React.FC = () => {
         </div>
       </div>
 
+      {/* Sub-view Navigation Switch: User Roster vs Role & Permissions Directory */}
+      <div className="flex items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 p-2 rounded-2xl">
+        <div className="flex items-center gap-1.5">
+          <button
+            id="view-tab-users-roster"
+            onClick={() => setActiveSubView('users')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeSubView === 'users'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Alumni Users & Role Assignment</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-950/60 text-slate-300">
+              {filteredAlumni.length}
+            </span>
+          </button>
+
+          <button
+            id="view-tab-role-matrix"
+            onClick={() => setActiveSubView('permissions')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeSubView === 'permissions'
+                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Role Permissions & Access Guide</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+              7 Roles
+            </span>
+          </button>
+        </div>
+
+        {activeSubView === 'users' && (
+          <button
+            onClick={() => setInspectingRole('super_admin')}
+            className="hidden sm:inline-flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 font-semibold px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition cursor-pointer"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>What do roles have access to?</span>
+          </button>
+        )}
+      </div>
+
+      {activeSubView === 'permissions' ? (
+        <RoleAccessMatrix />
+      ) : (
+        <>
+
       {/* Search & Filter Bar */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
@@ -444,7 +503,20 @@ export const AdminUserRoleManager: React.FC = () => {
                 <th className="px-5 py-3.5">Profession & City</th>
                 <th className="px-5 py-3.5">Registered On</th>
                 <th className="px-5 py-3.5">Account Status</th>
-                <th className="px-5 py-3.5">Assign Role</th>
+                <th className="px-5 py-3.5 min-w-[210px]">
+                  <div className="flex items-center justify-between">
+                    <span>Assign Role</span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveSubView('permissions')}
+                      className="text-[10px] text-amber-400 hover:underline normal-case flex items-center gap-1 font-semibold cursor-pointer"
+                      title="View complete RBAC matrix"
+                    >
+                      <HelpCircle className="w-3 h-3" />
+                      <span>Role Guide</span>
+                    </button>
+                  </div>
+                </th>
                 <th className="px-5 py-3.5 text-right">Moderation Actions</th>
               </tr>
             </thead>
@@ -537,23 +609,49 @@ export const AdminUserRoleManager: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-5 py-4">
-                        <select
-                          id={`role-select-${alum.id}`}
-                          defaultValue={isSuperAdminEmail ? 'super_admin' : 'alumnus'}
-                          onChange={e => {
-                            const newRole = e.target.value as UserRole;
-                            assignUserRole(alum.email, newRole);
-                            assignUserRole(alum.id, newRole);
-                          }}
-                          className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-amber-400 font-semibold focus:outline-none focus:border-amber-500"
-                        >
-                          <option value="super_admin">Super Administrator</option>
-                          <option value="alumni_manager">Alumni Manager</option>
-                          <option value="election_officer">Election Officer</option>
-                          <option value="auditor">Financial Auditor</option>
-                          <option value="alumnus">Verified Alumnus</option>
-                          <option value="guest">Guest / Read-only</option>
-                        </select>
+                        <div className="flex items-center gap-1.5">
+                          {(() => {
+                            const emailKey = (alum.email || '').toLowerCase().trim();
+                            const currentAssignedRole: UserRole = isSuperAdminEmail
+                              ? 'super_admin'
+                              : (userRolesMap[emailKey] || userRolesMap[alum.id] || 'alumnus');
+
+                            return (
+                              <>
+                                <select
+                                  id={`role-select-${alum.id}`}
+                                  value={currentAssignedRole}
+                                  onChange={e => {
+                                    const newRole = e.target.value as UserRole;
+                                    assignUserRole(alum.email, newRole);
+                                    assignUserRole(alum.id, newRole);
+                                  }}
+                                  className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-amber-400 font-semibold focus:outline-none focus:border-amber-500 flex-1"
+                                >
+                                  <option value="super_admin">Super Administrator</option>
+                                  <option value="principal">Principal / School Admin</option>
+                                  <option value="alumni_manager">Alumni Manager</option>
+                                  <option value="election_officer">Election Officer</option>
+                                  <option value="auditor">Financial Auditor</option>
+                                  <option value="alumnus">Verified Alumnus</option>
+                                  <option value="guest">Guest / Read-only</option>
+                                </select>
+
+                                <button
+                                  type="button"
+                                  id={`inspect-role-btn-${alum.id}`}
+                                  onClick={() => {
+                                    setInspectingRole(currentAssignedRole);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 border border-slate-700 hover:border-amber-500/50 transition cursor-pointer shrink-0"
+                                  title={`View access permissions for ${currentAssignedRole.replace('_', ' ')} role`}
+                                >
+                                  <HelpCircle className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            );
+                          })()}
+                        </div>
                       </td>
                       <td className="px-5 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
@@ -1491,6 +1589,119 @@ export const AdminUserRoleManager: React.FC = () => {
         onClose={() => setIsCSVModalOpen(false)}
         initialModule="alumni"
       />
+        </>
+      )}
+
+      {/* QUICK ROLE ACCESS INSPECTION MODAL */}
+      {inspectingRole && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-5 text-slate-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-white">{ROLE_METADATA[inspectingRole]?.name || inspectingRole}</h3>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${ROLE_METADATA[inspectingRole]?.badgeColor}`}>
+                      {ROLE_METADATA[inspectingRole]?.adminScope}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">Role Permission Breakdown & Authorized Privileges</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setInspectingRole(null)}
+                className="text-slate-400 hover:text-white p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4">
+                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Role Description</div>
+                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
+                  {ROLE_METADATA[inspectingRole]?.summary}
+                </p>
+                <div className="mt-2 text-xs text-amber-300">
+                  <strong>Recommended For: </strong> {ROLE_METADATA[inspectingRole]?.recommendedFor}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Accessible Modules & Actions
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInspectingRole(null);
+                      setActiveSubView('permissions');
+                    }}
+                    className="text-xs text-amber-400 hover:underline font-semibold cursor-pointer"
+                  >
+                    Open Full Matrix
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {(() => {
+                    const rolePerms = SEED_ROLES_PERMISSIONS.find(r => r.role === inspectingRole);
+                    if (inspectingRole === 'super_admin') {
+                      return (
+                        <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200">
+                          <strong>Master Unrestricted Privileges:</strong> Super Administrators have global root access across all school settings, notices, faculty, gallery, alumni moderation, RBAC role assignment, e-voting tallies, financial ledger creation, and CSV import/export.
+                        </div>
+                      );
+                    }
+                    if (!rolePerms || rolePerms.permissions.length === 0) {
+                      return (
+                        <div className="p-3 bg-slate-950 rounded-xl text-xs text-slate-400">
+                          No administrative permissions granted. This role has standard public guest view access only.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {rolePerms.permissions.map(perm => (
+                          <div key={perm} className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 flex items-center gap-2 text-xs">
+                            <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span className="font-mono text-slate-200">{perm}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setInspectingRole(null);
+                  setActiveSubView('permissions');
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+              >
+                Compare All Roles
+              </button>
+              <button
+                type="button"
+                onClick={() => setInspectingRole(null)}
+                className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

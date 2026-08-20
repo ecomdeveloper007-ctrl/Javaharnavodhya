@@ -96,6 +96,7 @@ export interface DataContextType {
   user: UserAuth | null;
   currentRole: UserRole;
   setCurrentRole: (role: UserRole) => void;
+  userRolesMap: Record<string, UserRole>;
   assignUserRole: (alumniIdOrEmail: string, role: UserRole) => void;
   hasPermission: (permission: string) => boolean;
   loginWithEmail: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
@@ -2622,6 +2623,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         currentRole,
         setCurrentRole,
+        userRolesMap,
         assignUserRole,
         hasPermission,
         loginWithEmail,

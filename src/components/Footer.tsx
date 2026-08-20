@@ -26,8 +26,12 @@ export const Footer: React.FC = () => {
           {/* Col 1: Identity */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-800 shadow-xs">
-                <GraduationCap className="w-5 h-5 text-amber-600" />
+              <div className="w-10 h-10 rounded-2xl bg-white border border-slate-200 p-0.5 flex items-center justify-center shadow-xs overflow-hidden">
+                <img
+                  src="/logo.jpg"
+                  alt="Navodaya Vidyalaya Logo"
+                  className="w-full h-full object-contain"
+                />
               </div>
               <div>
                 <h3 className={`text-sm font-bold text-slate-900 tracking-tight ${isHindi ? 'font-devanagari font-extrabold' : 'uppercase'}`}>

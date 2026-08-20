@@ -215,8 +215,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAIChat }) => {
           className="flex items-center space-x-3.5 cursor-pointer group"
         >
           {/* Emblem */}
-          <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 shadow-xs shrink-0 group-hover:bg-amber-100/70 transition">
-            <School className="w-6 h-6 sm:w-7 sm:h-7" />
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white border border-amber-200/80 p-1 flex items-center justify-center shadow-xs shrink-0 group-hover:border-amber-400 group-hover:shadow-md transition">
+            <img
+              src="/logo.jpg"
+              alt="Navodaya Vidyalaya Samiti Logo"
+              className="w-full h-full object-contain"
+            />
           </div>
 
           <div>

@@ -58,8 +58,12 @@ export const AboutSchoolModal: React.FC = () => {
         {/* Modal Header */}
         <div className="p-5 sm:p-6 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between shrink-0">
           <div className="flex items-center space-x-3">
-            <div className="w-11 h-11 rounded-2xl bg-amber-100 border border-amber-200 text-amber-800 flex items-center justify-center shadow-xs">
-              <Sparkles className="w-6 h-6" />
+            <div className="w-12 h-12 rounded-2xl bg-white border border-amber-200 p-0.5 flex items-center justify-center shadow-xs overflow-hidden shrink-0">
+              <img
+                src="/logo.jpg"
+                alt="Navodaya Emblem"
+                className="w-full h-full object-contain"
+              />
             </div>
             <div>
               <div className="flex items-center space-x-2">

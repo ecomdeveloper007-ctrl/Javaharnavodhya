@@ -1,6 +1,8 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getAuth,
+  setPersistence,
+  browserLocalPersistence,
   signInWithEmailAndPassword as fbSignInWithEmailAndPassword,
   createUserWithEmailAndPassword as fbCreateUserWithEmailAndPassword,
   sendPasswordResetEmail as fbSendPasswordResetEmail,
@@ -14,6 +16,13 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
+
+// Guarantee browser local persistence across page reloads and refreshes
+if (typeof window !== 'undefined') {
+  setPersistence(auth, browserLocalPersistence).catch((err) => {
+    console.warn('Firebase Auth persistence setup note:', err?.message || err);
+  });
+}
 
 export enum OperationType {
   CREATE = 'create',

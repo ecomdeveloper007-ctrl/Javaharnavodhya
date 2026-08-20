@@ -297,11 +297,73 @@ export interface DataContextType {
   setIsAdminPanelOpen: (open: boolean) => void;
 }
 
+// Helper functions to synchronously restore authentication session and active tab on page refresh
+const getInitialAuthSession = (): { user: UserAuth | null; role: UserRole } => {
+  try {
+    const savedSession = localStorage.getItem('jnv_auth_session');
+    if (savedSession) {
+      const parsed = JSON.parse(savedSession);
+      if (parsed && parsed.email) {
+        const email = (parsed.email || '').toLowerCase().trim();
+        const isSuperAdminEmail = email === 'prakashinfosys1234@gmail.com';
+        const assignedRole: UserRole = isSuperAdminEmail ? 'super_admin' : (parsed.role || 'alumnus');
+        const isAuthorizedAdmin =
+          isSuperAdminEmail ||
+          assignedRole === 'super_admin' ||
+          assignedRole === 'alumni_manager' ||
+          assignedRole === 'election_officer' ||
+          assignedRole === 'auditor' ||
+          assignedRole === 'principal';
+        const existingProfile = SEED_ALUMNI.find(a => (a.email || '').toLowerCase().trim() === email) || (isSuperAdminEmail ? SEED_ALUMNI[0] : undefined);
+
+        return {
+          user: {
+            uid: parsed.uid || (isSuperAdminEmail ? 'super-admin-prakash-uid' : 'user-' + Date.now()),
+            email: parsed.email,
+            displayName: parsed.displayName || (existingProfile ? existingProfile.fullName : (isSuperAdminEmail ? 'Dr. Prakash Rathore (Super Admin)' : 'Alumnus')),
+            photoURL: parsed.photoURL || existingProfile?.avatar || (isSuperAdminEmail ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=faces' : null),
+            isAdmin: isAuthorizedAdmin,
+            role: assignedRole,
+            profile: existingProfile
+          },
+          role: assignedRole
+        };
+      }
+    }
+  } catch (_) {}
+  return { user: null, role: 'guest' };
+};
+
+const getInitialActiveTab = (): string => {
+  try {
+    const saved = localStorage.getItem('jnv_active_tab');
+    if (saved && typeof saved === 'string') {
+      const validTabs = [
+        'home', 'about', 'principal', 'academics', 'faculty',
+        'admissions', 'notices', 'events', 'gallery', 'contact',
+        'financials', 'alumni', 'donations', 'blood-donation', 'admin'
+      ];
+      if (validTabs.includes(saved)) {
+        return saved;
+      }
+    }
+  } catch (_) {}
+  return 'home';
+};
+
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Navigation & UI Modal State
-  const [activeTab, setActiveTab] = useState<string>('home');
+  // Navigation & UI Modal State with Page Refresh Retention
+  const [activeTab, setActiveTabState] = useState<string>(getInitialActiveTab);
+
+  const setActiveTab = (tab: string) => {
+    setActiveTabState(tab);
+    try {
+      localStorage.setItem('jnv_active_tab', tab);
+    } catch (_) {}
+  };
+
   const [activeAlumniSubTab, setActiveAlumniSubTab] = useState<string>('directory');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isAboutModalOpen, setIsAboutModalOpen] = useState<boolean>(false);
@@ -314,8 +376,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [lastGeneratedReceipt, setLastGeneratedReceipt] = useState<DonationRecord | null>(null);
   const [isPersistenceLoaded, setIsPersistenceLoaded] = useState<boolean>(false);
 
-  // User & RBAC state
-  const [currentRole, setCurrentRole] = useState<UserRole>('guest');
+  // User & RBAC state with Synchronous Session Restoration
+  const initialAuth = getInitialAuthSession();
+  const [currentRole, setCurrentRole] = useState<UserRole>(initialAuth.role);
   const [userRolesMap, setUserRolesMap] = useState<Record<string, UserRole>>({
     'prakashinfosys1234@gmail.com': 'super_admin',
     'sunita.ias@rajasthan.gov.in': 'alumni_manager',
@@ -323,7 +386,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     'rajesh.ca@audit.in': 'auditor'
   });
 
-  const [user, setUser] = useState<UserAuth | null>(null);
+  const [user, setUser] = useState<UserAuth | null>(initialAuth.user);
 
   // Dynamic State collections initialized with standard default fallbacks
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings>(SEED_SCHOOL_SETTINGS);
@@ -486,7 +549,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  // Check for persisted session on initialization
+  // Sync active user profile details when alumni or role mappings update
   useEffect(() => {
     try {
       const savedSession = localStorage.getItem('jnv_auth_session');
@@ -495,24 +558,46 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (parsed && parsed.email) {
           const email = (parsed.email || '').toLowerCase().trim();
           const isSuperAdminEmail = email === 'prakashinfosys1234@gmail.com';
-          const assignedRole: UserRole = isSuperAdminEmail ? 'super_admin' : (parsed.role || 'alumnus');
-          const isAuthorizedAdmin = isSuperAdminEmail || assignedRole === 'super_admin' || assignedRole === 'alumni_manager' || assignedRole === 'election_officer' || assignedRole === 'auditor' || assignedRole === 'principal';
+          const mappedRole = userRolesMap[email] || userRolesMap[parsed.uid];
+          const assignedRole: UserRole = isSuperAdminEmail ? 'super_admin' : (mappedRole || parsed.role || 'alumnus');
+          const isAuthorizedAdmin =
+            isSuperAdminEmail ||
+            assignedRole === 'super_admin' ||
+            assignedRole === 'alumni_manager' ||
+            assignedRole === 'election_officer' ||
+            assignedRole === 'auditor' ||
+            assignedRole === 'principal';
           const existingProfile = alumni.find(a => (a.email || '').toLowerCase().trim() === email) || (isSuperAdminEmail ? SEED_ALUMNI[0] : undefined);
-          
-          setUser({
-            uid: parsed.uid || 'user-' + Date.now(),
-            email: parsed.email,
-            displayName: parsed.displayName || (existingProfile ? existingProfile.fullName : (isSuperAdminEmail ? 'Dr. Prakash Rathore (Super Admin)' : 'Alumnus')),
-            photoURL: parsed.photoURL || existingProfile?.avatar || null,
-            isAdmin: isAuthorizedAdmin,
-            role: assignedRole,
-            profile: existingProfile
+
+          if (!isSuperAdminEmail && existingProfile) {
+            if (existingProfile.verificationStatus === 'pending' || existingProfile.verificationStatus === 'rejected' || existingProfile.verificationStatus === 'deactivated') {
+              localStorage.removeItem('jnv_auth_session');
+              setUser(null);
+              setCurrentRole('guest');
+              return;
+            }
+          }
+
+          setUser(prev => {
+            const baseUid = parsed.uid || prev?.uid || (isSuperAdminEmail ? 'super-admin-prakash-uid' : 'user-' + Date.now());
+            const baseDisplayName = parsed.displayName || prev?.displayName || (existingProfile ? existingProfile.fullName : (isSuperAdminEmail ? 'Dr. Prakash Rathore (Super Admin)' : 'Alumnus'));
+            const basePhoto = parsed.photoURL || prev?.photoURL || existingProfile?.avatar || (isSuperAdminEmail ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=faces' : null);
+
+            return {
+              uid: baseUid,
+              email: parsed.email,
+              displayName: baseDisplayName,
+              photoURL: basePhoto,
+              isAdmin: isAuthorizedAdmin,
+              role: assignedRole,
+              profile: existingProfile || prev?.profile
+            };
           });
           setCurrentRole(assignedRole);
         }
       }
     } catch (_) {}
-  }, [alumni]);
+  }, [alumni, userRolesMap]);
 
   // Sync user state with Firebase auth listener
   useEffect(() => {
@@ -533,21 +618,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Security Enforcement: If not super admin and profile is pending, rejected, or deactivated, sign out
         if (!isSuperAdminEmail && existingProfile) {
-          if (existingProfile.verificationStatus === 'pending') {
-            await logoutUser();
-            localStorage.removeItem('jnv_auth_session');
-            setUser(null);
-            setCurrentRole('guest');
-            return;
-          }
-          if (existingProfile.verificationStatus === 'rejected') {
-            await logoutUser();
-            localStorage.removeItem('jnv_auth_session');
-            setUser(null);
-            setCurrentRole('guest');
-            return;
-          }
-          if (existingProfile.verificationStatus === 'deactivated') {
+          if (
+            existingProfile.verificationStatus === 'pending' ||
+            existingProfile.verificationStatus === 'rejected' ||
+            existingProfile.verificationStatus === 'deactivated'
+          ) {
             await logoutUser();
             localStorage.removeItem('jnv_auth_session');
             setUser(null);
@@ -560,7 +635,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           uid: fbUser.uid,
           email: fbUser.email,
           displayName: fbUser.displayName || (existingProfile ? existingProfile.fullName : (isSuperAdminEmail ? 'Dr. Prakash Rathore (Super Admin)' : 'Alumnus')),
-          photoURL: fbUser.photoURL || existingProfile?.avatar || null,
+          photoURL: fbUser.photoURL || existingProfile?.avatar || (isSuperAdminEmail ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=faces' : null),
           isAdmin: isAuthorizedAdmin,
           role: assignedRole,
           profile: existingProfile
@@ -579,16 +654,50 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }));
         } catch (_) {}
       } else {
-        // If not logged in via Firebase Auth, check if local Super Admin session exists
+        // If Firebase Auth returns null (e.g. initial token lookup delay, offline or persistent browser session),
+        // check if a valid session exists in localStorage
         try {
           const savedSession = localStorage.getItem('jnv_auth_session');
           if (savedSession) {
             const parsed = JSON.parse(savedSession);
-            if (parsed && (parsed.email || '').toLowerCase().trim() === 'prakashinfosys1234@gmail.com') {
-              return; // Keep super admin active
+            if (parsed && parsed.email) {
+              const email = (parsed.email || '').toLowerCase().trim();
+              const isSuperAdminEmail = email === 'prakashinfosys1234@gmail.com';
+              const mappedRole = userRolesMap[email] || userRolesMap[parsed.uid];
+              const assignedRole: UserRole = isSuperAdminEmail ? 'super_admin' : (mappedRole || parsed.role || 'alumnus');
+              const isAuthorizedAdmin =
+                isSuperAdminEmail ||
+                assignedRole === 'super_admin' ||
+                assignedRole === 'alumni_manager' ||
+                assignedRole === 'election_officer' ||
+                assignedRole === 'auditor' ||
+                assignedRole === 'principal';
+              const existingProfile = alumni.find(a => (a.email || '').toLowerCase().trim() === email) || (isSuperAdminEmail ? SEED_ALUMNI[0] : undefined);
+
+              if (!isSuperAdminEmail && existingProfile && (existingProfile.verificationStatus === 'pending' || existingProfile.verificationStatus === 'rejected' || existingProfile.verificationStatus === 'deactivated')) {
+                localStorage.removeItem('jnv_auth_session');
+                setUser(null);
+                setCurrentRole('guest');
+                return;
+              }
+
+              const restoredUser: UserAuth = {
+                uid: parsed.uid || (isSuperAdminEmail ? 'super-admin-prakash-uid' : 'user-' + Date.now()),
+                email: parsed.email,
+                displayName: parsed.displayName || (existingProfile ? existingProfile.fullName : (isSuperAdminEmail ? 'Dr. Prakash Rathore (Super Admin)' : 'Alumnus')),
+                photoURL: parsed.photoURL || existingProfile?.avatar || (isSuperAdminEmail ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=faces' : null),
+                isAdmin: isAuthorizedAdmin,
+                role: assignedRole,
+                profile: existingProfile
+              };
+
+              setUser(restoredUser);
+              setCurrentRole(assignedRole);
+              return;
             }
           }
         } catch (_) {}
+
         setUser(null);
         setCurrentRole('guest');
       }
@@ -930,11 +1039,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       console.warn('Logout notice', e);
     }
+    try {
+      localStorage.removeItem('jnv_auth_session');
+      localStorage.removeItem('jnv_active_tab');
+    } catch (_) {}
     setUser(null);
     setCurrentRole('guest');
-    if (activeTab === 'admin') {
-      setActiveTab('home');
-    }
+    setActiveTab('home');
   };
 
   // School Settings & CMS Mutations with Firestore

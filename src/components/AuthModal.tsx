@@ -115,8 +115,12 @@ export const AuthModal: React.FC = () => {
         {/* Header */}
         <div className="bg-slate-900 p-6 border-b border-slate-800 flex items-start justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
-              <GraduationCap className="w-6 h-6" />
+            <div className="w-12 h-12 rounded-2xl bg-white border border-slate-700 p-0.5 flex items-center justify-center shadow-xs overflow-hidden shrink-0">
+              <img
+                src="/logo.jpg"
+                alt="Navodaya Logo"
+                className="w-full h-full object-contain"
+              />
             </div>
             <div>
               <h3 className="text-lg font-bold text-white">

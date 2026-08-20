@@ -255,25 +255,34 @@ export const RegistrationModal: React.FC = () => {
       <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-xl w-full space-y-5 shadow-2xl text-slate-900 my-auto max-h-[92vh] overflow-y-auto">
         {/* Header */}
         <div className="flex justify-between items-start">
-          <div className="space-y-1">
-            <div className="inline-flex items-center space-x-2 px-2.5 py-0.5 rounded-full bg-amber-100 border border-amber-200 text-amber-900 text-xs font-semibold">
-              <GraduationCap className="w-3.5 h-3.5 text-amber-700" />
-              <span>{isHindi ? 'पूर्व छात्र पंजीकरण' : 'Alumni Registration'}</span>
+          <div className="flex items-start space-x-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-white border border-amber-200 p-0.5 flex items-center justify-center shadow-xs overflow-hidden shrink-0">
+              <img
+                src="/logo.jpg"
+                alt="Navodaya Logo"
+                className="w-full h-full object-contain"
+              />
             </div>
-            <h2 className="text-xl font-bold text-slate-900">
-              {isSubmitted
-                ? (isHindi ? 'पंजीकरण प्राप्त हुआ! ⏳' : 'Registration Submitted! ⏳')
-                : (isHindi ? 'ज.न.वि. पचपदरा पूर्व छात्र संजाल से जुड़ें' : 'Create Alumni Account')}
-            </h2>
-            <p className="text-xs text-slate-600">
-              {isSubmitted
-                ? (isHindi
-                    ? 'आपका खाता अनुमोदन की प्रतीक्षा कर रहा है।'
-                    : 'Your account is in pending state awaiting administrator review.')
-                : (isHindi
-                    ? 'ईमेल व पासवर्ड के साथ खाता बनाएं। व्यवस्थापक द्वारा अनुमोदन के बाद लॉगिन उपलब्ध होगा।'
-                    : 'Register with Email & Password. Account requires admin approval before login.')}
-            </p>
+            <div className="space-y-1">
+              <div className="inline-flex items-center space-x-2 px-2.5 py-0.5 rounded-full bg-amber-100 border border-amber-200 text-amber-900 text-xs font-semibold">
+                <GraduationCap className="w-3.5 h-3.5 text-amber-700" />
+                <span>{isHindi ? 'पूर्व छात्र पंजीकरण' : 'Alumni Registration'}</span>
+              </div>
+              <h2 className="text-xl font-bold text-slate-900">
+                {isSubmitted
+                  ? (isHindi ? 'पंजीकरण प्राप्त हुआ! ⏳' : 'Registration Submitted! ⏳')
+                  : (isHindi ? 'ज.न.वि. पचपदरा पूर्व छात्र संजाल से जुड़ें' : 'Create Alumni Account')}
+              </h2>
+              <p className="text-xs text-slate-600">
+                {isSubmitted
+                  ? (isHindi
+                      ? 'आपका खाता अनुमोदन की प्रतीक्षा कर रहा है।'
+                      : 'Your account is in pending state awaiting administrator review.')
+                  : (isHindi
+                      ? 'ईमेल व पासवर्ड के साथ खाता बनाएं। व्यवस्थापक द्वारा अनुमोदन के बाद लॉगिन उपलब्ध होगा।'
+                      : 'Register with Email & Password. Account requires admin approval before login.')}
+              </p>
+            </div>
           </div>
           <button
             type="button"

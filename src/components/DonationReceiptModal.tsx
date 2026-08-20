@@ -123,8 +123,12 @@ export const DonationReceiptModal: React.FC = () => {
             {/* Header */}
             <div className="flex items-start justify-between border-b-2 border-slate-200 pb-4">
               <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 rounded-xl bg-amber-500 flex items-center justify-center text-slate-950 font-black text-lg shadow-sm">
-                  JNV
+                <div className="w-14 h-14 rounded-xl bg-white border border-slate-300 p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
+                  <img
+                    src="/logo.jpg"
+                    alt="Navodaya Emblem"
+                    className="w-full h-full object-contain"
+                  />
                 </div>
                 <div>
                   <h2 className="font-extrabold text-slate-900 text-lg tracking-tight">

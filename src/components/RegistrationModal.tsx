@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useData } from '../context/DataContext';
 import { useLanguage } from '../context/LanguageContext';
+import { JNV_LOGO, handleLogoError } from '../assets/logo';
 import {
   GraduationCap,
   CheckCircle2,
@@ -258,7 +259,8 @@ export const RegistrationModal: React.FC = () => {
           <div className="flex items-start space-x-3.5">
             <div className="w-12 h-12 rounded-2xl bg-white border border-amber-200 p-0.5 flex items-center justify-center shadow-xs overflow-hidden shrink-0">
               <img
-                src="/logo.jpg"
+                src={JNV_LOGO}
+                onError={handleLogoError}
                 alt="Navodaya Logo"
                 className="w-full h-full object-contain"
               />

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useData } from '../../context/DataContext';
+import { JNV_LOGO, handleLogoError } from '../../assets/logo';
 import {
   LayoutDashboard,
   ShieldCheck,
@@ -333,7 +334,8 @@ export const AdminDashboard: React.FC<{ onClose?: () => void }> = ({ onClose }) 
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-white border border-slate-700 p-0.5 flex items-center justify-center shadow-md shrink-0 overflow-hidden">
               <img
-                src="/logo.jpg"
+                src={JNV_LOGO}
+                onError={handleLogoError}
                 alt="Navodaya Emblem"
                 className="w-full h-full object-contain"
               />

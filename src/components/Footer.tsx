@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useLanguage } from '../context/LanguageContext';
+import { JNV_LOGO, handleLogoError } from '../assets/logo';
 
 export const Footer: React.FC = () => {
   const { setActiveTab, setActiveAlumniSubTab, user, hasPermission } = useData();
@@ -28,7 +29,8 @@ export const Footer: React.FC = () => {
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 rounded-2xl bg-white border border-slate-200 p-0.5 flex items-center justify-center shadow-xs overflow-hidden">
                 <img
-                  src="/logo.jpg"
+                  src={JNV_LOGO}
+                  onError={handleLogoError}
                   alt="Navodaya Vidyalaya Logo"
                   className="w-full h-full object-contain"
                 />

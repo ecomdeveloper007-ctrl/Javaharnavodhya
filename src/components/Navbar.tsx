@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useData } from '../context/DataContext';
 import { useLanguage } from '../context/LanguageContext';
+import { JNV_LOGO, handleLogoError } from '../assets/logo';
 import {
   School,
   GraduationCap,
@@ -227,7 +228,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAIChat }) => {
           {/* Emblem */}
           <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white border border-amber-200/80 p-1 flex items-center justify-center shadow-xs shrink-0 group-hover:border-amber-400 group-hover:shadow-md transition">
             <img
-              src="/logo.jpg"
+              src={JNV_LOGO}
+              onError={handleLogoError}
               alt="Navodaya Vidyalaya Samiti Logo"
               className="w-full h-full object-contain"
             />

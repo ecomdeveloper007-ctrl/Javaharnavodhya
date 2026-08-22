@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { useData } from '../context/DataContext';
+import { JNV_LOGO, handleLogoError } from '../assets/logo';
 import {
   X,
   Printer,
@@ -125,7 +126,8 @@ export const DonationReceiptModal: React.FC = () => {
               <div className="flex items-center space-x-3">
                 <div className="w-14 h-14 rounded-xl bg-white border border-slate-300 p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
                   <img
-                    src="/logo.jpg"
+                    src={JNV_LOGO}
+                    onError={handleLogoError}
                     alt="Navodaya Emblem"
                     className="w-full h-full object-contain"
                   />

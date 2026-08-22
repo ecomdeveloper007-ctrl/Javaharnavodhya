@@ -203,6 +203,9 @@ export interface DataContextType {
   recordDonation: (donation: Omit<DonationRecord, 'id' | 'createdAt' | 'paymentStatus' | 'transactionRef' | 'receiptNumber' | 'taxExempt80GRegNo'>) => DonationRecord;
   verifyDonationRecord: (donationId: string, verifiedBy: string) => void;
   rejectDonationRecord: (donationId: string, reason: string) => void;
+  refundDonationRecord: (donationId: string, reason?: string) => void;
+  updateDonationStatus: (donationId: string, status: DonationRecord['paymentStatus'], note?: string) => void;
+  updateDonationRecord: (donationId: string, updates: Partial<DonationRecord>) => void;
   deleteDonationRecord: (donationId: string) => void;
   paymentSettings: PaymentSettings;
   updatePaymentSettings: (updates: Partial<PaymentSettings>) => void;
@@ -1671,6 +1674,49 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
+  const refundDonationRecord = (donationId: string, reason?: string) => {
+    setDonationRecords(prev =>
+      prev.map(d =>
+        d.id === donationId
+          ? {
+              ...d,
+              paymentStatus: 'REFUNDED',
+              rejectionReason: reason || 'Refund processed upon administrative audit.'
+            }
+          : d
+      )
+    );
+    updateDocInFirestore('donations', donationId, {
+      paymentStatus: 'REFUNDED',
+      rejectionReason: reason || 'Refund processed upon administrative audit.'
+    });
+  };
+
+  const updateDonationStatus = (donationId: string, status: DonationRecord['paymentStatus'], note?: string) => {
+    setDonationRecords(prev =>
+      prev.map(d =>
+        d.id === donationId
+          ? {
+              ...d,
+              paymentStatus: status,
+              rejectionReason: note || d.rejectionReason
+            }
+          : d
+      )
+    );
+    updateDocInFirestore('donations', donationId, {
+      paymentStatus: status,
+      ...(note ? { rejectionReason: note } : {})
+    });
+  };
+
+  const updateDonationRecord = (donationId: string, updates: Partial<DonationRecord>) => {
+    setDonationRecords(prev =>
+      prev.map(d => (d.id === donationId ? { ...d, ...updates } : d))
+    );
+    updateDocInFirestore('donations', donationId, updates);
+  };
+
   const deleteDonationRecord = (donationId: string) => {
     setDonationRecords(prev => prev.filter(d => d.id !== donationId));
     deleteDocFromFirestore('donations', donationId);
@@ -2718,6 +2764,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         recordDonation,
         verifyDonationRecord,
         rejectDonationRecord,
+        refundDonationRecord,
+        updateDonationStatus,
+        updateDonationRecord,
         deleteDonationRecord,
 
         bloodDonors,

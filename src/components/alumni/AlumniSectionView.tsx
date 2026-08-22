@@ -34,7 +34,8 @@ import { SchoolEventsView } from '../school/SchoolEventsView';
 import { FinancialTransparencyView } from '../school/FinancialTransparencyView';
 import { DonationPortalView } from '../donations/DonationPortalView';
 import { BloodDonationView } from '../blood/BloodDonationView';
-import { Droplet, HeartHandshake, Receipt } from 'lucide-react';
+import { MemberDashboard } from './MemberDashboard';
+import { Droplet, HeartHandshake, Receipt, UserCheck } from 'lucide-react';
 
 export const AlumniSectionView: React.FC = () => {
   const {
@@ -160,6 +161,18 @@ export const AlumniSectionView: React.FC = () => {
         {/* Horizontal Navigation Sub-tabs */}
         <div className="flex space-x-2 overflow-x-auto no-scrollbar pt-4 border-t border-slate-100">
           <button
+            onClick={() => setActiveAlumniSubTab('member_dashboard')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center space-x-2 ${
+              activeAlumniSubTab === 'member_dashboard'
+                ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
+                : 'text-amber-900 bg-amber-50/80 hover:bg-amber-100 hover:text-amber-950 border border-amber-200'
+            }`}
+          >
+            <UserCheck className="w-4 h-4 text-amber-700" />
+            <span>My Member Dashboard</span>
+          </button>
+
+          <button
             onClick={() => setActiveAlumniSubTab('directory')}
             className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center space-x-2 ${
               activeAlumniSubTab === 'directory'
@@ -268,6 +281,13 @@ export const AlumniSectionView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* SUBTAB 0: MEMBER DASHBOARD (FRONTEND SUBMISSIONS & MANAGEMENT) */}
+      {activeAlumniSubTab === 'member_dashboard' && (
+        <div className="pt-2">
+          <MemberDashboard />
+        </div>
+      )}
 
       {/* SUBTAB 1: DIRECTORY & SEARCH */}
       {activeAlumniSubTab === 'directory' && (

@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { JobPosting, BusinessListing, WelfareCase, DonationCampaign, Achievement } from '../../types';
 import { CSVBulkImportModal } from './CSVBulkImportModal';
+import { AdminPaymentSettings } from './AdminPaymentSettings';
+import { CreditCard, Receipt } from 'lucide-react';
 
 export const AdminCommunityCMS: React.FC = () => {
   const {
@@ -53,10 +55,11 @@ export const AdminCommunityCMS: React.FC = () => {
     addDonationCampaign,
     updateDonationCampaign,
     deleteDonationCampaign,
+    donationRecords,
     getCSVTemplate
   } = useData();
 
-  const [activeTab, setActiveTab] = useState<'jobs' | 'businesses' | 'campaigns' | 'welfare' | 'achievements'>('campaigns');
+  const [activeTab, setActiveTab] = useState<'campaigns' | 'welfare' | 'payment_settings' | 'achievements' | 'jobs' | 'businesses'>('campaigns');
   const [csvModalModule, setCsvModalModule] = useState<string | null>(null);
 
   const handleDownloadSample = (moduleId: string) => {
@@ -151,6 +154,7 @@ export const AdminCommunityCMS: React.FC = () => {
           {[
             { id: 'campaigns', label: 'Donation Fundraisers', count: donationCampaigns.length, icon: Target },
             { id: 'welfare', label: 'Alumni Welfare Cases', count: welfareCases.length, icon: HeartHandshake },
+            { id: 'payment_settings', label: 'Welfare Payment Settings & Gateways', count: donationRecords.length, icon: CreditCard },
             { id: 'achievements', label: 'Hall of Fame', count: achievements.length, icon: Award },
             { id: 'jobs', label: 'Job Board', count: jobs.length, icon: Briefcase },
             { id: 'businesses', label: 'Business Directory', count: businesses.length, icon: Store }
@@ -162,7 +166,7 @@ export const AdminCommunityCMS: React.FC = () => {
                 key={tab.id}
                 id={`comm-tab-${tab.id}`}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   isActive
                     ? 'bg-violet-500 text-slate-950 shadow-md shadow-violet-500/20'
                     : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60'
@@ -472,6 +476,11 @@ export const AdminCommunityCMS: React.FC = () => {
               ))}
           </div>
         </div>
+      )}
+
+      {/* 6. Alumni Welfare Payment Settings & Gateway Hub */}
+      {activeTab === 'payment_settings' && (
+        <AdminPaymentSettings />
       )}
 
       {/* New Campaign Modal */}

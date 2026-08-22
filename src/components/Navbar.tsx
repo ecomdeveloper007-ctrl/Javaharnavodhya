@@ -33,7 +33,8 @@ import {
   Heart,
   HeartHandshake,
   Droplet,
-  Receipt
+  Receipt,
+  UserCheck
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -160,6 +161,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAIChat }) => {
 
             {user ? (
               <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleNavClick('alumni', 'member_dashboard')}
+                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 text-[10px] font-bold rounded-lg transition flex items-center space-x-1 shadow-2xs cursor-pointer"
+                  title="My Alumni Member Dashboard"
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>{isHindi ? 'मेरा डैशबोर्ड' : 'My Dashboard'}</span>
+                </button>
+
                 {(user.isAdmin || hasPermission('access_admin_portal') || user.email?.toLowerCase().trim() === 'prakashinfosys1234@gmail.com') && (
                   <button
                     id="top-banner-map-btn"
@@ -555,6 +565,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAIChat }) => {
                     </div>
                     <div className="py-1">
                       <button
+                        onClick={() => handleNavClick('alumni', 'member_dashboard')}
+                        className={`w-full text-left px-3.5 py-2 text-xs flex items-center space-x-2.5 cursor-pointer ${
+                          activeTab === 'alumni' && activeAlumniSubTab === 'member_dashboard'
+                            ? 'bg-amber-100 text-amber-950 font-bold'
+                            : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                        }`}
+                      >
+                        <UserCheck className="w-4 h-4 text-amber-600" />
+                        <div>
+                          <div className="font-bold leading-tight text-amber-950">{isHindi ? 'मेरा सदस्य डैशबोर्ड' : 'My Member Dashboard'}</div>
+                          <div className="text-[10px] text-slate-500 font-normal">{isHindi ? 'प्रोफ़ाइल, व्यवसाय, जॉब पोस्ट एवं 80G रसीदें' : 'Profile, businesses, jobs & 80G receipts'}</div>
+                        </div>
+                      </button>
+                      <button
                         onClick={() => handleNavClick('alumni', 'directory')}
                         className={`w-full text-left px-3.5 py-2 text-xs flex items-center space-x-2.5 cursor-pointer ${
                           activeTab === 'alumni' && activeAlumniSubTab === 'directory'
@@ -866,6 +890,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAIChat }) => {
 
             {isMobileAlumniExpanded && (
               <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-amber-200/80">
+                <button
+                  onClick={() => handleNavClick('alumni', 'member_dashboard')}
+                  className={`col-span-2 text-left px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 cursor-pointer ${
+                    activeTab === 'alumni' && activeAlumniSubTab === 'member_dashboard'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'bg-amber-100 text-amber-950 hover:bg-amber-200 border border-amber-300'
+                  }`}
+                >
+                  <UserCheck className="w-3.5 h-3.5 text-amber-800 shrink-0" />
+                  <span className="truncate">{isHindi ? 'मेरा सदस्य डैशबोर्ड (व्यवसाय/जॉब्स/रसीदें)' : 'My Member Dashboard (Post Business & Jobs)'}</span>
+                </button>
                 <button
                   onClick={() => handleNavClick('alumni', 'directory')}
                   className={`text-left px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-1.5 cursor-pointer ${

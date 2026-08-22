@@ -224,12 +224,38 @@ export interface PaymentSettings {
   donationContactPhone: string;
   currency: string;
   minDonationAmount: number;
+  maxDonationAmount?: number;
   enableUpi: boolean;
   enableBankTransfer: boolean;
   enablePaymentGateway: boolean;
+  enableCards?: boolean;
+  enableNetbanking?: boolean;
   enableManualOther: boolean;
   reg80GNumber: string;
   taxBenefitPercentage: number;
+  // Gateway configuration
+  activeGateway?: 'razorpay' | 'cashfree' | 'stripe' | 'payu' | 'phonepe' | 'custom_upi';
+  gatewayMode?: 'test' | 'live';
+  razorpayKeyId?: string;
+  razorpayKeySecret?: string;
+  razorpayWebhookSecret?: string;
+  cashfreeAppId?: string;
+  cashfreeSecretKey?: string;
+  stripePublishableKey?: string;
+  stripeSecretKey?: string;
+  payuMerchantKey?: string;
+  payuMerchantSalt?: string;
+  phonepeMerchantId?: string;
+  phonepeSaltKey?: string;
+  phonepeSaltIndex?: string;
+  // Payment success & failure settings
+  successRedirectUrl?: string;
+  successCustomMessage?: string;
+  failureRedirectUrl?: string;
+  failureCustomMessage?: string;
+  webhookUrl?: string;
+  webhookSecret?: string;
+  platformFeePercentage?: number;
   updatedAt: string;
 }
 
